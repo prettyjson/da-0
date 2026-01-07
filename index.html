@@ -1580,6 +1580,27 @@ AUG  $24.9M  ██████████████████████�
             units: []
         };
         let webcamStream = null;
+        let currentUser = null;
+        let channelIdMap = {}; // Maps channel names to IDs
+
+        // API Helper
+        const API_BASE = '';
+        async function api(endpoint, options = {}) {
+            const res = await fetch(`${API_BASE}${endpoint}`, {
+                headers: { 'Content-Type': 'application/json', ...options.headers },
+                ...options
+            });
+            return res.json();
+        }
+
+        // Format currency
+        function formatCurrency(num) {
+            return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function formatLargeNumber(num) {
+            return num.toLocaleString('en-US');
+        }
 
         // Auth Functions
         function showSignup() {
@@ -1592,25 +1613,40 @@ AUG  $24.9M  ██████████████████████�
             document.getElementById('login-form').classList.remove('hidden');
         }
 
-        function handleLogin() {
+        async function handleLogin() {
             const username = document.getElementById('login-username').value;
             const password = document.getElementById('login-password').value;
-            
+
             if (username && password) {
-                // Mock login - just show the main app
-                document.getElementById('auth-screen').classList.add('hidden');
-                document.getElementById('main-app').classList.add('active');
-                document.getElementById('current-user').textContent = username.toUpperCase();
+                try {
+                    const result = await api('/api/auth/login', {
+                        method: 'POST',
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    if (result.success) {
+                        currentUser = result.user;
+                        document.getElementById('auth-screen').classList.add('hidden');
+                        document.getElementById('main-app').classList.add('active');
+                        document.getElementById('current-user').textContent = currentUser.username;
+
+                        // Load all data
+                        await loadAllData();
+                    }
+                } catch (err) {
+                    console.error('Login error:', err);
+                    alert('Login failed');
+                }
             } else {
                 alert('Please enter username and password');
             }
         }
 
-        function startVerification() {
+        async function startVerification() {
             const email = document.getElementById('signup-email').value;
             const username = document.getElementById('signup-username').value;
             const password = document.getElementById('signup-password').value;
-            
+
             if (email && username && password) {
                 // Start verification flow
                 document.getElementById('auth-screen').classList.add('hidden');
@@ -1621,12 +1657,429 @@ AUG  $24.9M  ██████████████████████�
             }
         }
 
-        function logout() {
+        async function logout() {
             if (confirm('Are you sure you want to logout?')) {
+                if (currentUser) {
+                    await api('/api/auth/logout', {
+                        method: 'POST',
+                        body: JSON.stringify({ userId: currentUser.id })
+                    });
+                }
+                currentUser = null;
                 document.getElementById('main-app').classList.remove('active');
                 document.getElementById('auth-screen').classList.remove('hidden');
                 document.getElementById('login-username').value = '';
                 document.getElementById('login-password').value = '';
+            }
+        }
+
+        // Load all data from APIs
+        async function loadAllData() {
+            await Promise.all([
+                loadNetworkStats(),
+                loadTreasury(),
+                loadLeaderboard(),
+                loadMembers(),
+                loadProposals(),
+                loadChannels(),
+                loadStages(),
+                loadUserProfile()
+            ]);
+        }
+
+        // Load network stats
+        async function loadNetworkStats() {
+            const stats = await api('/api/stats');
+            const treasury = await api('/api/treasury');
+
+            const statsContainer = document.querySelector('.stats-section');
+            const statRows = statsContainer.querySelectorAll('.stat-row');
+
+            statRows[0].querySelector('.stat-value').textContent = formatLargeNumber(stats.total_members);
+            statRows[1].querySelector('.stat-value').textContent = formatCurrency(stats.annual_income);
+            statRows[2].querySelector('.stat-value').textContent = formatLargeNumber(stats.active_nodes);
+            statRows[3].querySelector('.stat-value').textContent = formatCurrency(treasury.balance);
+
+            if (currentUser) {
+                statRows[4].querySelector('.stat-value').textContent = currentUser.stake_percentage + '%';
+                statRows[5].querySelector('.stat-value').textContent = formatCurrency(currentUser.last_dividend || 0);
+            }
+        }
+
+        // Load treasury data
+        async function loadTreasury() {
+            const treasury = await api('/api/treasury');
+
+            // Update treasury balance box
+            document.querySelector('#treasury .treasury-box:first-child .big-number').textContent = formatCurrency(treasury.balance);
+            const balanceRows = document.querySelectorAll('#treasury .treasury-box:first-child .stat-row');
+            balanceRows[0].querySelector('.stat-value').textContent = formatCurrency(treasury.member_dues);
+            balanceRows[1].querySelector('.stat-value').textContent = formatCurrency(treasury.investments);
+            balanceRows[2].querySelector('.stat-value').textContent = formatCurrency(treasury.pending);
+
+            // Update spending box
+            document.querySelector('#treasury .treasury-box:last-child .big-number').textContent = formatCurrency(treasury.monthly_spending);
+            const spendingRows = document.querySelectorAll('#treasury .treasury-box:last-child .stat-row');
+            spendingRows[0].querySelector('.stat-value').textContent = formatCurrency(treasury.operations_spending);
+            spendingRows[1].querySelector('.stat-value').textContent = formatCurrency(treasury.member_services_spending);
+            spendingRows[2].querySelector('.stat-value').textContent = formatCurrency(treasury.admin_spending);
+
+            // Update ASCII chart with real percentages
+            const totalSpending = treasury.operations_spending + treasury.member_services_spending + treasury.admin_spending;
+            const opsPct = ((treasury.operations_spending / totalSpending) * 100).toFixed(1);
+            const svcPct = ((treasury.member_services_spending / totalSpending) * 100).toFixed(1);
+            const adminPct = ((treasury.admin_spending / totalSpending) * 100).toFixed(1);
+
+            const totalIncome = treasury.member_dues + treasury.investments + (treasury.pending * 0.1);
+            const duesPct = ((treasury.member_dues / totalIncome) * 100).toFixed(1);
+            const invPct = ((treasury.investments / totalIncome) * 100).toFixed(1);
+
+            const chart = `OPERATIONS     ${'█'.repeat(Math.floor(opsPct / 2))} ${opsPct}%
+MEMBER_SVCS    ${'█'.repeat(Math.floor(svcPct / 2))} ${svcPct}%
+ADMIN          ${'█'.repeat(Math.floor(adminPct / 2))} ${adminPct}%
+
+INCOME_STREAMS:
+MEMBER_DUES    ${'█'.repeat(Math.floor(duesPct))} ${duesPct}%
+INVESTMENTS    ${'█'.repeat(Math.floor(invPct / 2.5))} ${invPct}%
+DONATIONS      ${'█'.repeat(2)} 0.9%
+
+HISTORICAL_TREND (12_MONTHS):
+JAN  $22.1M  ${'█'.repeat(44)}
+FEB  $22.8M  ${'█'.repeat(49)}
+MAR  $23.2M  ${'█'.repeat(54)}
+APR  $23.9M  ${'█'.repeat(57)}
+MAY  $24.1M  ${'█'.repeat(58)}
+JUN  $24.3M  ${'█'.repeat(59)}
+JUL  $24.6M  ${'█'.repeat(60)}
+AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
+
+            document.querySelector('.ascii-chart').textContent = chart;
+        }
+
+        // Load leaderboard
+        async function loadLeaderboard() {
+            const leaders = await api('/api/members/leaderboard?limit=6');
+            const leaderboardContainer = document.querySelector('#overview .members-table');
+
+            // Keep header row
+            const headerRow = leaderboardContainer.querySelector('.table-row:first-child');
+            leaderboardContainer.innerHTML = '';
+            leaderboardContainer.innerHTML = '<div style="font-weight: bold; margin-bottom: 15px;">TOP_STAKEHOLDERS_LEADERBOARD</div>';
+            leaderboardContainer.appendChild(headerRow);
+
+            leaders.forEach((member, index) => {
+                const row = document.createElement('div');
+                row.className = 'table-row';
+                row.innerHTML = `
+                    <div class="table-cell rank">${String(index + 1).padStart(3, '0')}</div>
+                    <div class="table-cell">${member.username}</div>
+                    <div class="table-cell">${member.unit || 'N/A'}</div>
+                    <div class="table-cell percentage">${member.stake_percentage}%</div>
+                    <div class="table-cell ${member.is_online ? 'error-text' : ''}" style="${!member.is_online ? 'color: #666;' : ''}">${member.is_online ? '●' : '○'}</div>
+                `;
+                leaderboardContainer.appendChild(row);
+            });
+
+            // Add ellipsis and current user
+            if (currentUser) {
+                const ellipsisRow = document.createElement('div');
+                ellipsisRow.className = 'table-row';
+                ellipsisRow.innerHTML = `
+                    <div class="table-cell rank">...</div>
+                    <div class="table-cell">...</div>
+                    <div class="table-cell">...</div>
+                    <div class="table-cell">...</div>
+                    <div class="table-cell">...</div>
+                `;
+                leaderboardContainer.appendChild(ellipsisRow);
+
+                const userRow = document.createElement('div');
+                userRow.className = 'table-row';
+                userRow.innerHTML = `
+                    <div class="table-cell rank">087</div>
+                    <div class="table-cell warning-text">${currentUser.username}</div>
+                    <div class="table-cell">${currentUser.unit || 'N/A'}</div>
+                    <div class="table-cell percentage">${currentUser.stake_percentage}%</div>
+                    <div class="table-cell error-text">●</div>
+                `;
+                leaderboardContainer.appendChild(userRow);
+            }
+        }
+
+        // Load members
+        async function loadMembers() {
+            const { members } = await api('/api/members?limit=20');
+            const membersContainer = document.querySelector('#members .members-table');
+
+            membersContainer.innerHTML = '<div style="font-weight: bold; margin-bottom: 15px;">COMPLETE_MEMBER_DIRECTORY</div>';
+
+            // Add header
+            const headerRow = document.createElement('div');
+            headerRow.className = 'table-row';
+            headerRow.innerHTML = `
+                <div class="table-cell">RANK</div>
+                <div class="table-cell">CALLSIGN</div>
+                <div class="table-cell">UNIT</div>
+                <div class="table-cell">STAKE%</div>
+                <div class="table-cell">STATUS</div>
+            `;
+            membersContainer.appendChild(headerRow);
+
+            members.forEach((member, index) => {
+                const row = document.createElement('div');
+                row.className = 'table-row';
+                row.innerHTML = `
+                    <div class="table-cell rank">${String(index + 1).padStart(3, '0')}</div>
+                    <div class="table-cell">${member.username}</div>
+                    <div class="table-cell">${member.unit || 'N/A'}</div>
+                    <div class="table-cell percentage">${member.stake_percentage}%</div>
+                    <div class="table-cell ${member.is_online ? 'error-text' : ''}" style="${!member.is_online ? 'color: #666;' : ''}">${member.is_online ? '●' : '○'}</div>
+                `;
+                membersContainer.appendChild(row);
+            });
+        }
+
+        // Load proposals
+        async function loadProposals() {
+            const proposals = await api('/api/proposals');
+            let userVotes = [];
+            if (currentUser) {
+                userVotes = await api(`/api/users/${currentUser.id}/votes`);
+            }
+
+            const activeContainer = document.querySelector('#votes .votes-section:first-child');
+            const historyContainer = document.querySelector('#votes .votes-section:last-child');
+
+            activeContainer.innerHTML = '<div style="font-weight: bold; margin-bottom: 15px;">ACTIVE_NETWORK_VOTES</div>';
+            historyContainer.innerHTML = '<div style="font-weight: bold; margin-bottom: 15px;">RECENT_VOTE_HISTORY</div>';
+
+            proposals.forEach(proposal => {
+                const totalVotes = proposal.yes_count + proposal.no_count;
+                const yesPercent = totalVotes > 0 ? Math.round((proposal.yes_count / totalVotes) * 100) : 0;
+                const noPercent = 100 - yesPercent;
+
+                const userVote = userVotes.find(v => v.proposal_id === proposal.id);
+                const voteStatus = userVote
+                    ? `<span class="status-success">YOUR_VOTE: ${userVote.vote.toUpperCase()}</span>`
+                    : '<span class="warning-text">YOUR_VOTE: NOT_CAST</span>';
+
+                const voteItem = document.createElement('div');
+                voteItem.className = 'vote-item';
+                voteItem.onclick = () => showVoteDialog(proposal.id, proposal.title);
+                voteItem.innerHTML = `
+                    <div class="vote-title">PROPOSAL_${String(proposal.id).padStart(3, '0')}: ${proposal.title}</div>
+                    <div style="color: #888; font-size: 11px; margin-bottom: 8px;">
+                        INITIATED: ${proposal.initiated_date} | CLOSES: ${proposal.closes_date}_2359Z | QUORUM: ${proposal.quorum_required}% | STATUS: ${proposal.status.toUpperCase()}
+                    </div>
+                    <div class="vote-bar">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${yesPercent}%;"></div>
+                        </div>
+                        <span>${proposal.status === 'active' ? '' : 'FINAL: '}YES: ${yesPercent}% (${formatLargeNumber(proposal.yes_count)} votes) | NO: ${noPercent}% (${formatLargeNumber(proposal.no_count)} votes)</span>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 10px;">
+                        >> ${voteStatus} | WEIGHT: ${currentUser?.stake_percentage || 0}%
+                    </div>
+                `;
+
+                if (proposal.status === 'active') {
+                    activeContainer.appendChild(voteItem);
+                } else {
+                    historyContainer.appendChild(voteItem);
+                }
+            });
+        }
+
+        // Vote dialog
+        async function showVoteDialog(proposalId, title) {
+            if (!currentUser) return;
+
+            const vote = prompt(`Vote on "${title}"\n\nEnter: yes, no, or abstain`);
+            if (vote && ['yes', 'no', 'abstain'].includes(vote.toLowerCase())) {
+                await api(`/api/proposals/${proposalId}/vote`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id, vote: vote.toLowerCase() })
+                });
+                await loadProposals();
+            }
+        }
+
+        // Load channels
+        async function loadChannels() {
+            const channels = await api('/api/channels');
+            const chatList = document.querySelector('.chat-list');
+
+            chatList.innerHTML = '<div style="font-weight: bold; margin-bottom: 15px; color: #00ff41;">CHANNELS</div>';
+
+            const regularChannels = channels.filter(c => c.type === 'channel');
+            const dmChannels = channels.filter(c => c.type === 'dm');
+
+            regularChannels.forEach((channel, index) => {
+                channelIdMap[channel.name.toLowerCase()] = channel.id;
+                const room = document.createElement('div');
+                room.className = `chat-room${index === 0 ? ' active' : ''}`;
+                room.onclick = () => switchChannel(channel.id, channel.name);
+                room.innerHTML = `
+                    <span style="margin-right: 8px;">#</span>
+                    <span>${channel.name}</span>
+                    <span class="unread-count">${channel.unread_count || '--'}</span>
+                `;
+                chatList.appendChild(room);
+            });
+
+            chatList.innerHTML += '<div style="margin: 15px 0; font-weight: bold; color: #00ff41;">DIRECT_MSG</div>';
+
+            dmChannels.forEach(channel => {
+                channelIdMap[channel.name.toLowerCase()] = channel.id;
+                const displayName = channel.name.replace('DM_', '');
+                const room = document.createElement('div');
+                room.className = 'chat-room';
+                room.onclick = () => switchChannel(channel.id, displayName, true);
+                room.innerHTML = `
+                    <span style="margin-right: 8px;">@</span>
+                    <span>${displayName}</span>
+                    <span class="unread-count">${channel.unread_count || '--'}</span>
+                `;
+                chatList.appendChild(room);
+            });
+
+            // Load first channel messages
+            if (regularChannels.length > 0) {
+                await loadMessages(regularChannels[0].id, regularChannels[0].name);
+            }
+        }
+
+        let currentChannelId = null;
+
+        async function switchChannel(channelId, channelName, isDM = false) {
+            const rooms = document.querySelectorAll('.chat-room');
+            rooms.forEach(room => room.classList.remove('active'));
+            event.target.closest('.chat-room').classList.add('active');
+
+            currentChannelId = channelId;
+            await loadMessages(channelId, channelName, isDM);
+        }
+
+        async function loadMessages(channelId, channelName, isDM = false) {
+            currentChannelId = channelId;
+            const messages = await api(`/api/channels/${channelId}/messages`);
+
+            const chatHeader = document.getElementById('chat-header');
+            const chatMessages = document.getElementById('chat-messages');
+
+            chatHeader.textContent = isDM ? `DM: ${channelName}` : `#${channelName} - ${messages.length} messages`;
+            chatMessages.innerHTML = '';
+
+            messages.forEach(msg => {
+                const timestamp = new Date(msg.timestamp);
+                const timeStr = `[${String(timestamp.getUTCHours()).padStart(2, '0')}${String(timestamp.getUTCMinutes()).padStart(2, '0')}Z]`;
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message';
+                messageDiv.innerHTML = `
+                    <div class="message-header">
+                        <span>${msg.username}</span>
+                        <span class="timestamp">${timeStr}</span>
+                    </div>
+                    <div>${msg.content}</div>
+                `;
+                chatMessages.appendChild(messageDiv);
+            });
+
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+
+            if (message && currentChannelId && currentUser) {
+                const newMsg = await api(`/api/channels/${currentChannelId}/messages`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id, content: message })
+                });
+
+                const chatMessages = document.getElementById('chat-messages');
+                const timestamp = new Date(newMsg.timestamp);
+                const timeStr = `[${String(timestamp.getUTCHours()).padStart(2, '0')}${String(timestamp.getUTCMinutes()).padStart(2, '0')}Z]`;
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message';
+                messageDiv.innerHTML = `
+                    <div class="message-header">
+                        <span>${newMsg.username}</span>
+                        <span class="timestamp">${timeStr}</span>
+                    </div>
+                    <div>${newMsg.content}</div>
+                `;
+                chatMessages.appendChild(messageDiv);
+
+                input.value = '';
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        }
+
+        // Load stages
+        async function loadStages() {
+            const stages = await api('/api/stages');
+            const stagesContainer = document.querySelector('.live-stages');
+
+            stagesContainer.innerHTML = '<div style="font-weight: bold; margin-bottom: 15px; color: #00ff41;">LIVE_VOICE_CHANNELS</div>';
+
+            stages.forEach(stage => {
+                const stageItem = document.createElement('div');
+                stageItem.className = 'stage-item';
+                stageItem.onclick = () => joinStage(stage.id, stage.name);
+                stageItem.innerHTML = `
+                    <span ${stage.is_live ? 'class="live-indicator"' : 'style="margin-right: 10px; color: #666;"'}>${stage.is_live ? '●' : '○'}</span>
+                    <span ${!stage.is_live ? 'style="color: #888;"' : ''}>${stage.name}</span>
+                    <span class="stage-listeners" ${!stage.is_live ? 'style="color: #666;"' : ''}>${stage.listener_count || '--'}</span>
+                `;
+                stagesContainer.appendChild(stageItem);
+            });
+
+            stagesContainer.innerHTML += `
+                <div style="margin-top: 15px; font-size: 10px; color: #666;">
+                    >> JOIN_STAGE [STAGE_NAME]<br/>
+                    >> CREATE_STAGE --private
+                </div>
+            `;
+        }
+
+        async function joinStage(stageId, stageName) {
+            await api(`/api/stages/${stageId}/join`, { method: 'POST' });
+            alert(`Joining voice stage: ${stageName}\n\nThis would connect you to the live voice channel.`);
+            await loadStages();
+        }
+
+        // Load user profile
+        async function loadUserProfile() {
+            if (!currentUser) return;
+
+            const profile = await api(`/api/profile/${currentUser.id}`);
+            currentUser = { ...currentUser, ...profile };
+
+            document.getElementById('profile-username').textContent = profile.username;
+            document.getElementById('profile-rank').textContent = `${profile.rank_code} ${profile.rank_title}`;
+            document.getElementById('profile-unit').textContent = profile.unit?.replace(/_/g, ' ') || 'N/A';
+
+            // Update other profile fields
+            const profileRows = document.querySelectorAll('.profile-row .stat-value');
+            if (profileRows.length >= 8) {
+                profileRows[2].textContent = profile.mos || 'N/A';
+                profileRows[3].textContent = profile.service_years || 'N/A';
+                profileRows[4].textContent = profile.deployment_history || 'N/A';
+                profileRows[5].textContent = profile.clearance || 'N/A';
+                profileRows[6].textContent = profile.stake_percentage + '%';
+                profileRows[7].textContent = profile.join_date || 'N/A';
+            }
+
+            // Update badges
+            const badgesContainer = document.getElementById('profile-badges');
+            if (profile.badges && profile.badges.length > 0) {
+                badgesContainer.innerHTML = profile.badges.map(badge =>
+                    `<div class="badge">${badge}</div>`
+                ).join('');
             }
         }
 
@@ -1817,14 +2270,14 @@ AUG  $24.9M  ██████████████████████�
             }, 1000);
         }
 
-        // Main App Functions (existing code)
+        // Main App Functions
         function showSection(sectionName) {
             const sections = document.querySelectorAll('.section');
             sections.forEach(section => section.classList.remove('active'));
-            
+
             const tabs = document.querySelectorAll('.nav-tab');
             tabs.forEach(tab => tab.classList.remove('active'));
-            
+
             document.getElementById(sectionName).classList.add('active');
             event.target.classList.add('active');
         }
@@ -1837,140 +2290,6 @@ AUG  $24.9M  ██████████████████████�
             if (!event || event.target.id === 'profile-popup' || event.target.classList.contains('profile-close')) {
                 document.getElementById('profile-popup').classList.remove('show');
             }
-        }
-
-        let currentChannel = 'general';
-        const chatData = {
-            general: {
-                title: '#GENERAL - 1,847 members online',
-                messages: [
-                    { user: 'SGT_THOMPSON_A', time: '[0847Z]', text: 'Anyone else having issues with the new benefits portal?' },
-                    { user: 'LCDR_PATEL_K', time: '[0849Z]', text: '@SGT_THOMPSON_A Try clearing your browser cache, worked for me' },
-                    { user: 'CPL_MARTINEZ_R', time: '[0851Z]', text: 'Reminder: Network vote on Coast Guard expansion closes in 4 days' },
-                    { user: 'MAJ_CHEN_L', time: '[0853Z]', text: 'Good morning everyone. Treasury report will be posted after the 1000Z briefing' },
-                    { user: 'SFC_RODRIGUEZ_J', time: '[0855Z]', text: 'New member orientation tonight at 1900Z. All welcome to join and help' },
-                    { user: 'LT_ANDERSON_C', time: '[0857Z]', text: 'Can confirm benefits portal is working now. Thanks for the quick fix team' }
-                ]
-            },
-            officers: {
-                title: '#OFFICERS_CLUB - 89 members online',
-                messages: [
-                    { user: 'COL_HAYES_R', time: '[0832Z]', text: 'Morning briefing notes: Network expansion vote trending positive' },
-                    { user: 'MAJ_CHEN_L', time: '[0834Z]', text: 'Treasury allocations look good for Q3. Should we brief the members?' },
-                    { user: 'CPT_WILLIAMS_M', time: '[0836Z]', text: 'Agreed. Transparency builds trust. Full report recommended' },
-                    { user: 'LT_ANDERSON_C', time: '[0840Z]', text: 'New member onboarding process needs streamlining' }
-                ]
-            },
-            nco: {
-                title: '#NCO_CLUB - 342 members online',
-                messages: [
-                    { user: 'SFC_RODRIGUEZ_J', time: '[0825Z]', text: 'Weekly NCO meeting tonight. Agenda includes mentorship program' },
-                    { user: 'SSGT_JOHNSON_T', time: '[0828Z]', text: 'Junior enlisted are asking about career transition resources' },
-                    { user: 'SGT_MARTINEZ_J', time: '[0830Z]', text: 'Good point. Maybe we need a dedicated channel for career advice' },
-                    { user: 'CPL_DAVIS_M', time: '[0835Z]', text: 'I can help with resume reviews. Did 50+ last month for transition' }
-                ]
-            },
-            intel: {
-                title: '#INTEL_BRIEF - 156 members online',
-                messages: [
-                    { user: 'SYSTEM', time: '[0800Z]', text: '=== DAILY INTELLIGENCE BRIEF ===' },
-                    { user: 'LTC_BLACKWOOD', time: '[0801Z]', text: 'Network security: No threats detected in last 24h' },
-                    { user: 'MAJ_CRYPTO_01', time: '[0803Z]', text: 'Member verification backlog cleared. 23 new authentications' },
-                    { user: 'CPT_CYBER_07', time: '[0805Z]', text: 'Monitoring suspicious login attempts. Patterns suggest automated probing' }
-                ]
-            },
-            dm1: {
-                title: 'DM: COL_HAYES_R',
-                messages: [
-                    { user: 'COL_HAYES_R', time: '[0745Z]', text: 'Martinez, good work on the quarterly report analysis' },
-                    { user: 'SGT_MARTINEZ_J', time: '[0746Z]', text: 'Thank you sir. Happy to contribute to network operations' },
-                    { user: 'COL_HAYES_R', time: '[0748Z]', text: 'Consider applying for the finance committee. Your insights are valuable' }
-                ]
-            },
-            dm2: {
-                title: 'DM: CPT_WILLIAMS_M',
-                messages: [
-                    { user: 'SGT_MARTINEZ_J', time: '[0730Z]', text: 'Morning Captain. Ready for today\'s briefing prep?' },
-                    { user: 'CPT_WILLIAMS_M', time: '[0732Z]', text: 'Absolutely. Can you pull the member satisfaction metrics?' },
-                    { user: 'SGT_MARTINEZ_J', time: '[0734Z]', text: 'Already compiled. Sending via encrypted channel now' }
-                ]
-            },
-            dm3: {
-                title: 'DM: SSGT_CHEN_K',
-                messages: [
-                    { user: 'SSGT_CHEN_K', time: '[0720Z]', text: 'Hey Martinez, you free to help with new member orientation prep?' },
-                    { user: 'SGT_MARTINEZ_J', time: '[0722Z]', text: 'Sure thing. What do you need?' },
-                    { user: 'SSGT_CHEN_K', time: '[0724Z]', text: 'Presentation slides for DD214 verification process' },
-                    { user: 'SGT_MARTINEZ_J', time: '[0726Z]', text: 'I\'ll have those ready by 1200Z. Standard brief format?' },
-                    { user: 'SSGT_CHEN_K', time: '[0728Z]', text: 'Perfect. Thanks, you\'re the best' }
-                ]
-            }
-        };
-
-        function switchChannel(channelName) {
-            const rooms = document.querySelectorAll('.chat-room');
-            rooms.forEach(room => room.classList.remove('active'));
-            
-            event.target.classList.add('active');
-            
-            currentChannel = channelName;
-            const chatHeader = document.getElementById('chat-header');
-            const chatMessages = document.getElementById('chat-messages');
-            
-            chatHeader.textContent = chatData[channelName].title;
-            
-            chatMessages.innerHTML = '';
-            chatData[channelName].messages.forEach(msg => {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message';
-                messageDiv.innerHTML = `
-                    <div class="message-header">
-                        <span>${msg.user}</span>
-                        <span class="timestamp">${msg.time}</span>
-                    </div>
-                    <div>${msg.text}</div>
-                `;
-                chatMessages.appendChild(messageDiv);
-            });
-            
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        function sendMessage() {
-            const input = document.getElementById('message-input');
-            const message = input.value.trim();
-            
-            if (message) {
-                const now = new Date();
-                const timeStr = '[' + now.toISOString().substr(11, 4) + 'Z]';
-                
-                const currentUser = document.getElementById('current-user').textContent;
-                
-                chatData[currentChannel].messages.push({
-                    user: currentUser,
-                    time: timeStr,
-                    text: message
-                });
-                
-                const chatMessages = document.getElementById('chat-messages');
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message';
-                messageDiv.innerHTML = `
-                    <div class="message-header">
-                        <span>${currentUser}</span>
-                        <span class="timestamp">${timeStr}</span>
-                    </div>
-                    <div>${message}</div>
-                `;
-                chatMessages.appendChild(messageDiv);
-                
-                input.value = '';
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            }
-        }
-
-        function joinStage(stageName) {
-            alert(`Joining voice stage: ${stageName.toUpperCase()}\n\nThis would connect you to the live voice channel.`);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -1986,10 +2305,10 @@ AUG  $24.9M  ██████████████████████�
 
         setInterval(function() {
             const now = new Date();
-            const timeStr = now.toISOString().substr(8, 2) + 'AUG25_' + 
-                           now.toISOString().substr(11, 2) + 
+            const timeStr = now.toISOString().substr(8, 2) + 'AUG25_' +
+                           now.toISOString().substr(11, 2) +
                            now.toISOString().substr(14, 2) + 'Z';
-            
+
             const systemInfo = document.querySelector('.system-info');
             if (systemInfo) {
                 systemInfo.innerHTML = `SYSTEM_STATUS: OPERATIONAL | PING: ${Math.floor(Math.random() * 30 + 20)}ms | LAST_SYNC: ${timeStr}`;
