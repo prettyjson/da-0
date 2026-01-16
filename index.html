@@ -3423,8 +3423,9 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
         }
 
         // Refresh token when role changes (approved to speak)
+        // Need to reconnect to LiveKit with new permissions
         async function refreshLiveKitToken() {
-            if (!livekitEnabled || !livekitRoom || !currentNetId) return;
+            if (!livekitEnabled || !currentNetId) return;
 
             try {
                 const tokenData = await api(`/api/nets/${currentNetId}/refresh-token`, {
@@ -3433,11 +3434,24 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 });
 
                 if (tokenData.canPublish && !localAudioTrack) {
-                    await enableLocalAudio();
-                    showToast('MIC_ENABLED - You can now speak!');
+                    // Need to disconnect and reconnect with new token for publish permissions
+                    if (livekitRoom) {
+                        console.log('Reconnecting to LiveKit with speaker permissions...');
+
+                        // Disconnect current session
+                        await livekitRoom.disconnect();
+
+                        // Reconnect with new token that has publish permissions
+                        await livekitRoom.connect(tokenData.url || livekitUrl, tokenData.token);
+
+                        // Now enable local audio
+                        await enableLocalAudio();
+                        showToast('MIC_ENABLED - You can now speak!');
+                    }
                 }
             } catch (err) {
                 console.error('Error refreshing token:', err);
+                showToast('Error enabling microphone');
             }
         }
 

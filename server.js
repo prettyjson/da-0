@@ -971,7 +971,7 @@ app.post('/api/nets/:id/refresh-token', async (req, res) => {
         });
 
         const token = await at.toJwt();
-        res.json({ token, canPublish });
+        res.json({ token, canPublish, url: LIVEKIT_URL });
     } catch (error) {
         res.status(500).json({ error: 'Failed to refresh token' });
     }
