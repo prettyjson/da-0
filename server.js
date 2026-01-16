@@ -471,6 +471,369 @@ app.get('/api/users/:userId/referrals', (req, res) => {
     res.json({ referrals, count: referrals.length });
 });
 
+// ============ NETS (AUDIO ROOMS) ROUTES ============
+
+// Get all live/scheduled nets
+app.get('/api/nets', (req, res) => {
+    const { status = 'live' } = req.query;
+    const nets = db().prepare(`
+        SELECT n.*, u.username as host_username, u.rank_code as host_rank,
+        (SELECT COUNT(*) FROM net_participants WHERE net_id = n.id AND left_at IS NULL) as participant_count,
+        (SELECT COUNT(*) FROM net_participants WHERE net_id = n.id AND role IN ('speaker', 'co-host', 'host') AND left_at IS NULL) as speaker_count
+        FROM nets n
+        JOIN users u ON n.host_id = u.id
+        WHERE n.status = ?
+        ORDER BY n.started_at DESC
+    `).all(status);
+    res.json(nets);
+});
+
+// Create a new net
+app.post('/api/nets', (req, res) => {
+    const { userId, name, description } = req.body;
+
+    const result = db().prepare(`
+        INSERT INTO nets (name, description, host_id, status, started_at)
+        VALUES (?, ?, ?, 'live', ?)
+    `).run(name, description || null, userId, new Date().toISOString());
+
+    // Add host as participant
+    db().prepare(`
+        INSERT INTO net_participants (net_id, user_id, role, is_muted)
+        VALUES (?, ?, 'host', 0)
+    `).run(result.lastInsertRowid, userId);
+
+    const net = db().prepare(`
+        SELECT n.*, u.username as host_username
+        FROM nets n
+        JOIN users u ON n.host_id = u.id
+        WHERE n.id = ?
+    `).get(result.lastInsertRowid);
+
+    res.json(net);
+});
+
+// Get a single net with participants
+app.get('/api/nets/:id', (req, res) => {
+    const net = db().prepare(`
+        SELECT n.*, u.username as host_username, u.rank_code as host_rank
+        FROM nets n
+        JOIN users u ON n.host_id = u.id
+        WHERE n.id = ?
+    `).get(req.params.id);
+
+    if (!net) {
+        return res.status(404).json({ error: 'Net not found' });
+    }
+
+    const participants = db().prepare(`
+        SELECT np.*, u.username, u.rank_code, u.unit
+        FROM net_participants np
+        JOIN users u ON np.user_id = u.id
+        WHERE np.net_id = ? AND np.left_at IS NULL
+        ORDER BY
+            CASE np.role
+                WHEN 'host' THEN 1
+                WHEN 'co-host' THEN 2
+                WHEN 'speaker' THEN 3
+                ELSE 4
+            END
+    `).all(req.params.id);
+
+    const pendingRequests = db().prepare(`
+        SELECT sr.*, u.username
+        FROM speak_requests sr
+        JOIN users u ON sr.user_id = u.id
+        WHERE sr.net_id = ? AND sr.status = 'pending'
+    `).all(req.params.id);
+
+    net.participants = participants;
+    net.pendingRequests = pendingRequests;
+    net.speakerCount = participants.filter(p => ['host', 'co-host', 'speaker'].includes(p.role)).length;
+    net.listenerCount = participants.filter(p => p.role === 'listener').length;
+
+    res.json(net);
+});
+
+// Join a net as listener
+app.post('/api/nets/:id/join', (req, res) => {
+    const { userId } = req.body;
+    const netId = req.params.id;
+
+    // Check if already in net
+    const existing = db().prepare(`
+        SELECT * FROM net_participants WHERE net_id = ? AND user_id = ? AND left_at IS NULL
+    `).get(netId, userId);
+
+    if (existing) {
+        return res.json({ success: true, participant: existing, message: 'Already in net' });
+    }
+
+    // Check if was in net before (rejoin)
+    const previous = db().prepare(`
+        SELECT * FROM net_participants WHERE net_id = ? AND user_id = ?
+    `).get(netId, userId);
+
+    if (previous) {
+        db().prepare(`
+            UPDATE net_participants SET left_at = NULL, joined_at = ?, role = 'listener'
+            WHERE net_id = ? AND user_id = ?
+        `).run(new Date().toISOString(), netId, userId);
+    } else {
+        db().prepare(`
+            INSERT INTO net_participants (net_id, user_id, role, is_muted)
+            VALUES (?, ?, 'listener', 1)
+        `).run(netId, userId);
+    }
+
+    const participant = db().prepare(`
+        SELECT np.*, u.username FROM net_participants np
+        JOIN users u ON np.user_id = u.id
+        WHERE np.net_id = ? AND np.user_id = ?
+    `).get(netId, userId);
+
+    res.json({ success: true, participant });
+});
+
+// Leave a net
+app.post('/api/nets/:id/leave', (req, res) => {
+    const { userId } = req.body;
+    const netId = req.params.id;
+
+    db().prepare(`
+        UPDATE net_participants SET left_at = ?
+        WHERE net_id = ? AND user_id = ?
+    `).run(new Date().toISOString(), netId, userId);
+
+    res.json({ success: true });
+});
+
+// End a net (host only)
+app.post('/api/nets/:id/end', (req, res) => {
+    const { userId } = req.body;
+    const netId = req.params.id;
+
+    const net = db().prepare('SELECT * FROM nets WHERE id = ?').get(netId);
+    if (!net) {
+        return res.status(404).json({ error: 'Net not found' });
+    }
+
+    // Check if user is host or co-host
+    const participant = db().prepare(`
+        SELECT * FROM net_participants WHERE net_id = ? AND user_id = ? AND role IN ('host', 'co-host')
+    `).get(netId, userId);
+
+    if (!participant && net.host_id !== userId) {
+        return res.status(403).json({ error: 'Only hosts can end the net' });
+    }
+
+    db().prepare(`
+        UPDATE nets SET status = 'ended', ended_at = ?
+        WHERE id = ?
+    `).run(new Date().toISOString(), netId);
+
+    // Mark all participants as left
+    db().prepare(`
+        UPDATE net_participants SET left_at = ?
+        WHERE net_id = ? AND left_at IS NULL
+    `).run(new Date().toISOString(), netId);
+
+    res.json({ success: true });
+});
+
+// Invite co-host
+app.post('/api/nets/:id/invite-cohost', (req, res) => {
+    const { userId, targetUserId } = req.body;
+    const netId = req.params.id;
+
+    // Verify requester is host
+    const net = db().prepare('SELECT * FROM nets WHERE id = ? AND host_id = ?').get(netId, userId);
+    if (!net) {
+        return res.status(403).json({ error: 'Only hosts can invite co-hosts' });
+    }
+
+    // Update target user's role
+    db().prepare(`
+        UPDATE net_participants SET role = 'co-host', is_muted = 0
+        WHERE net_id = ? AND user_id = ?
+    `).run(netId, targetUserId);
+
+    res.json({ success: true });
+});
+
+// Request to speak
+app.post('/api/nets/:id/request-speak', (req, res) => {
+    const { userId } = req.body;
+    const netId = req.params.id;
+
+    // Check if already requested
+    const existing = db().prepare(`
+        SELECT * FROM speak_requests WHERE net_id = ? AND user_id = ? AND status = 'pending'
+    `).get(netId, userId);
+
+    if (existing) {
+        return res.json({ success: true, request: existing, message: 'Request already pending' });
+    }
+
+    const result = db().prepare(`
+        INSERT INTO speak_requests (net_id, user_id, status)
+        VALUES (?, ?, 'pending')
+    `).run(netId, userId);
+
+    const request = db().prepare('SELECT * FROM speak_requests WHERE id = ?').get(result.lastInsertRowid);
+    res.json({ success: true, request });
+});
+
+// Get pending speak requests (for hosts)
+app.get('/api/nets/:id/speak-requests', (req, res) => {
+    const requests = db().prepare(`
+        SELECT sr.*, u.username, u.rank_code
+        FROM speak_requests sr
+        JOIN users u ON sr.user_id = u.id
+        WHERE sr.net_id = ? AND sr.status = 'pending'
+        ORDER BY sr.requested_at ASC
+    `).all(req.params.id);
+    res.json(requests);
+});
+
+// Approve speaker
+app.post('/api/nets/:id/approve-speaker', (req, res) => {
+    const { userId, targetUserId, requestId } = req.body;
+    const netId = req.params.id;
+
+    // Verify requester is host/co-host
+    const participant = db().prepare(`
+        SELECT * FROM net_participants WHERE net_id = ? AND user_id = ? AND role IN ('host', 'co-host')
+    `).get(netId, userId);
+
+    if (!participant) {
+        return res.status(403).json({ error: 'Only hosts can approve speakers' });
+    }
+
+    // Update speak request
+    db().prepare(`
+        UPDATE speak_requests SET status = 'approved', resolved_at = ?, resolved_by = ?
+        WHERE id = ?
+    `).run(new Date().toISOString(), userId, requestId);
+
+    // Update participant role
+    db().prepare(`
+        UPDATE net_participants SET role = 'speaker', is_muted = 0
+        WHERE net_id = ? AND user_id = ?
+    `).run(netId, targetUserId);
+
+    res.json({ success: true });
+});
+
+// Deny speaker request
+app.post('/api/nets/:id/deny-speaker', (req, res) => {
+    const { userId, requestId } = req.body;
+    const netId = req.params.id;
+
+    // Verify requester is host/co-host
+    const participant = db().prepare(`
+        SELECT * FROM net_participants WHERE net_id = ? AND user_id = ? AND role IN ('host', 'co-host')
+    `).get(netId, userId);
+
+    if (!participant) {
+        return res.status(403).json({ error: 'Only hosts can deny speakers' });
+    }
+
+    db().prepare(`
+        UPDATE speak_requests SET status = 'denied', resolved_at = ?, resolved_by = ?
+        WHERE id = ?
+    `).run(new Date().toISOString(), userId, requestId);
+
+    res.json({ success: true });
+});
+
+// Demote speaker back to listener
+app.post('/api/nets/:id/demote-speaker', (req, res) => {
+    const { userId, targetUserId } = req.body;
+    const netId = req.params.id;
+
+    // Verify requester is host/co-host
+    const participant = db().prepare(`
+        SELECT * FROM net_participants WHERE net_id = ? AND user_id = ? AND role IN ('host', 'co-host')
+    `).get(netId, userId);
+
+    if (!participant) {
+        return res.status(403).json({ error: 'Only hosts can demote speakers' });
+    }
+
+    db().prepare(`
+        UPDATE net_participants SET role = 'listener', is_muted = 1
+        WHERE net_id = ? AND user_id = ?
+    `).run(netId, targetUserId);
+
+    res.json({ success: true });
+});
+
+// Toggle mute (for speakers)
+app.post('/api/nets/:id/toggle-mute', (req, res) => {
+    const { userId } = req.body;
+    const netId = req.params.id;
+
+    const participant = db().prepare(`
+        SELECT * FROM net_participants WHERE net_id = ? AND user_id = ?
+    `).get(netId, userId);
+
+    if (!participant || participant.role === 'listener') {
+        return res.status(403).json({ error: 'Only speakers can toggle mute' });
+    }
+
+    const newMuteState = participant.is_muted ? 0 : 1;
+    db().prepare(`
+        UPDATE net_participants SET is_muted = ?
+        WHERE net_id = ? AND user_id = ?
+    `).run(newMuteState, netId, userId);
+
+    res.json({ success: true, is_muted: newMuteState });
+});
+
+// Get net chat messages
+app.get('/api/nets/:id/messages', (req, res) => {
+    const { limit = 100 } = req.query;
+    const messages = db().prepare(`
+        SELECT nm.*, u.username, u.rank_code
+        FROM net_messages nm
+        JOIN users u ON nm.user_id = u.id
+        WHERE nm.net_id = ?
+        ORDER BY nm.timestamp ASC
+        LIMIT ?
+    `).all(req.params.id, parseInt(limit));
+    res.json(messages);
+});
+
+// Send net chat message
+app.post('/api/nets/:id/messages', (req, res) => {
+    const { userId, content } = req.body;
+    const netId = req.params.id;
+
+    // Verify user is in net
+    const participant = db().prepare(`
+        SELECT * FROM net_participants WHERE net_id = ? AND user_id = ? AND left_at IS NULL
+    `).get(netId, userId);
+
+    if (!participant) {
+        return res.status(403).json({ error: 'Must be in net to send messages' });
+    }
+
+    const result = db().prepare(`
+        INSERT INTO net_messages (net_id, user_id, content, timestamp)
+        VALUES (?, ?, ?, ?)
+    `).run(netId, userId, content, new Date().toISOString());
+
+    const message = db().prepare(`
+        SELECT nm.*, u.username, u.rank_code
+        FROM net_messages nm
+        JOIN users u ON nm.user_id = u.id
+        WHERE nm.id = ?
+    `).get(result.lastInsertRowid);
+
+    res.json(message);
+});
+
 // Serve index.html for all other routes (SPA support)
 app.get('/{*path}', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
