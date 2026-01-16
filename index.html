@@ -750,6 +750,266 @@
         .hidden {
             display: none !important;
         }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 255, 65, 0.95);
+            color: #0a0a0a;
+            padding: 12px 24px;
+            border: 2px solid #00ff41;
+            font-weight: bold;
+            z-index: 2000;
+            animation: toastIn 0.3s ease;
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        /* Invite Modal */
+        .invite-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #004d15;
+        }
+
+        .invite-code {
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid #00ff41;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .invite-code:hover {
+            background: rgba(0, 255, 65, 0.2);
+        }
+
+        .invite-stats {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 11px;
+        }
+
+        .referral-badge {
+            display: inline-block;
+            background: rgba(0, 255, 65, 0.2);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            padding: 2px 8px;
+            margin: 2px;
+            font-size: 10px;
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            body {
+                font-size: 11px;
+                overflow-x: hidden;
+            }
+
+            .auth-box {
+                padding: 20px;
+                margin: 10px;
+            }
+
+            .auth-logo {
+                font-size: 24px;
+            }
+
+            .terminal-container {
+                padding: 10px;
+            }
+
+            .terminal-header {
+                padding: 8px;
+            }
+
+            .header-line {
+                flex-wrap: wrap;
+                gap: 5px;
+                font-size: 9px;
+            }
+
+            .header-line span {
+                flex: 1 1 auto;
+            }
+
+            /* Stack main grid on mobile */
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            /* Stack treasury grid on mobile */
+            .treasury-grid {
+                grid-template-columns: 1fr;
+            }
+
+            /* Horizontal scroll for tables */
+            .members-table {
+                overflow-x: auto;
+            }
+
+            .table-row {
+                grid-template-columns: 40px 120px 80px 60px 50px;
+                font-size: 10px;
+                min-width: 350px;
+            }
+
+            /* Navigation tabs - scrollable */
+            .nav-tabs {
+                overflow-x: auto;
+                gap: 10px;
+                padding-bottom: 15px;
+                flex-wrap: nowrap;
+            }
+
+            .nav-tab {
+                padding: 8px 12px;
+                font-size: 10px;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+
+            /* Chat terminal - stack on mobile */
+            .chat-terminal {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .chat-list {
+                max-height: 150px;
+                overflow-y: auto;
+            }
+
+            .chat-window {
+                height: 350px;
+            }
+
+            .chat-messages {
+                font-size: 10px;
+            }
+
+            /* Vote items */
+            .vote-bar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+
+            .progress-bar {
+                width: 100%;
+            }
+
+            .vote-title {
+                font-size: 11px;
+            }
+
+            /* Profile popup */
+            .profile-content {
+                padding: 15px;
+                max-height: 90vh;
+                overflow-y: auto;
+            }
+
+            .profile-row {
+                flex-direction: column;
+                gap: 2px;
+            }
+
+            .profile-row .stat-label {
+                font-size: 9px;
+            }
+
+            /* ASCII chart - smaller font */
+            .ascii-chart {
+                font-size: 7px;
+                overflow-x: auto;
+            }
+
+            .chart-container {
+                min-height: auto;
+                overflow-x: auto;
+            }
+
+            /* Big numbers smaller on mobile */
+            .big-number {
+                font-size: 18px;
+            }
+
+            /* System info repositioned */
+            .system-info {
+                font-size: 8px;
+                bottom: 5px;
+                right: 5px;
+                left: 5px;
+                text-align: center;
+            }
+
+            /* Verification steps */
+            .verification-step {
+                padding: 15px;
+            }
+
+            .step-title {
+                font-size: 14px;
+            }
+
+            .file-upload {
+                padding: 20px;
+            }
+
+            .upload-icon {
+                font-size: 32px;
+            }
+
+            /* Stages */
+            .live-stages {
+                font-size: 11px;
+            }
+
+            .stage-item {
+                padding: 10px 0;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .auth-logo {
+                font-size: 20px;
+            }
+
+            .nav-tabs {
+                gap: 5px;
+            }
+
+            .nav-tab {
+                padding: 6px 8px;
+                font-size: 9px;
+            }
+
+            .table-row {
+                grid-template-columns: 35px 100px 70px 50px 40px;
+                font-size: 9px;
+            }
+
+            .ascii-chart {
+                display: none;
+            }
+
+            .chart-container::after {
+                content: '[Chart optimized for desktop view]';
+                color: #666;
+                font-size: 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1560,6 +1820,49 @@ AUG  $24.9M  ██████████████████████�
                     LAST_BACKGROUND_CHECK: 15MAR24<br/>
                     NEXT_VERIFICATION: 15MAR25
                 </div>
+
+                <!-- Referral Section -->
+                <div class="invite-section" id="referral-section">
+                    <div style="font-weight: bold; margin-bottom: 10px; color: #00ff41;">REFERRAL_NETWORK</div>
+
+                    <!-- Who referred you -->
+                    <div id="referred-by-section" class="hidden">
+                        <div class="profile-row">
+                            <span class="stat-label">RECRUITED_BY:</span>
+                            <span class="stat-value" id="referred-by-name">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Your referral stats -->
+                    <div class="invite-stats">
+                        <span>INVITES_THIS_WEEK: <span id="invites-remaining">5</span>/5</span>
+                        <span>TOTAL_RECRUITS: <span id="total-referrals">0</span></span>
+                    </div>
+
+                    <!-- Generate invite button -->
+                    <button class="btn-primary" style="margin: 10px 0;" onclick="generateInvite()">
+                        GENERATE_INVITE_CODE
+                    </button>
+
+                    <!-- Active invite code display -->
+                    <div id="invite-code-display" class="hidden">
+                        <div class="invite-code" onclick="copyInviteCode()">
+                            <span id="current-invite-code">VET-XXXXXX</span>
+                            <div style="font-size: 9px; color: #888; margin-top: 5px;">TAP TO COPY</div>
+                        </div>
+                        <div style="text-align: center; margin-top: 5px;">
+                            <button class="btn-secondary" style="width: auto; padding: 8px 15px;" onclick="shareInvite()">
+                                SHARE_INVITE
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Your recruits list -->
+                    <div id="referrals-list" class="hidden" style="margin-top: 15px;">
+                        <div style="font-size: 10px; color: #888; margin-bottom: 5px;">YOUR_RECRUITS:</div>
+                        <div id="referrals-container"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -2081,7 +2384,156 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                     `<div class="badge">${badge}</div>`
                 ).join('');
             }
+
+            // Load referral data
+            await loadReferralData();
         }
+
+        // ============ REFERRAL SYSTEM ============
+
+        let currentInviteCode = null;
+
+        // Toast notification helper
+        function showToast(message) {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Load referral data for current user
+        async function loadReferralData() {
+            if (!currentUser) return;
+
+            try {
+                // Get invite stats
+                const inviteData = await api(`/api/invites/${currentUser.id}`);
+                document.getElementById('invites-remaining').textContent = inviteData.weeklyInvitesRemaining;
+                document.getElementById('total-referrals').textContent = inviteData.totalReferrals;
+
+                // Check if user was referred by someone
+                const referrerData = await api(`/api/users/${currentUser.id}/referrer`);
+                if (referrerData.referrer) {
+                    document.getElementById('referred-by-section').classList.remove('hidden');
+                    document.getElementById('referred-by-name').textContent = referrerData.referrer.username;
+                }
+
+                // Load list of people this user has referred
+                const referralsData = await api(`/api/users/${currentUser.id}/referrals`);
+                if (referralsData.count > 0) {
+                    document.getElementById('referrals-list').classList.remove('hidden');
+                    const container = document.getElementById('referrals-container');
+                    container.innerHTML = referralsData.referrals.map(r =>
+                        `<div class="referral-badge">${r.username}</div>`
+                    ).join('');
+                }
+
+                // Show most recent unused invite if exists
+                const unusedInvite = inviteData.invites.find(i => !i.used_by);
+                if (unusedInvite) {
+                    currentInviteCode = unusedInvite.code;
+                    document.getElementById('current-invite-code').textContent = unusedInvite.code;
+                    document.getElementById('invite-code-display').classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error('Error loading referral data:', err);
+            }
+        }
+
+        // Generate a new invite code
+        async function generateInvite() {
+            if (!currentUser) return;
+
+            try {
+                const result = await api('/api/invites', {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id })
+                });
+
+                if (result.error) {
+                    showToast(result.error);
+                    return;
+                }
+
+                currentInviteCode = result.invite.code;
+                document.getElementById('current-invite-code').textContent = result.invite.code;
+                document.getElementById('invite-code-display').classList.remove('hidden');
+                document.getElementById('invites-remaining').textContent = result.remaining;
+
+                showToast('INVITE_CODE_GENERATED!');
+            } catch (err) {
+                showToast('ERROR_GENERATING_INVITE');
+            }
+        }
+
+        // Copy invite code to clipboard
+        async function copyInviteCode() {
+            if (!currentInviteCode) return;
+
+            try {
+                await navigator.clipboard.writeText(currentInviteCode);
+                showToast('CODE_COPIED: ' + currentInviteCode);
+            } catch (err) {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = currentInviteCode;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showToast('CODE_COPIED: ' + currentInviteCode);
+            }
+        }
+
+        // Share invite via native share or copy link
+        async function shareInvite() {
+            if (!currentInviteCode) return;
+
+            const shareText = `Join VETNET - the credentialed veterans network. Use my invite code: ${currentInviteCode}`;
+            const shareUrl = window.location.origin + '?invite=' + currentInviteCode;
+
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'VETNET Invite',
+                        text: shareText,
+                        url: shareUrl
+                    });
+                    showToast('INVITE_SHARED!');
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        copyInviteCode();
+                    }
+                }
+            } else {
+                // Fallback: copy to clipboard
+                try {
+                    await navigator.clipboard.writeText(shareText + '\n' + shareUrl);
+                    showToast('INVITE_LINK_COPIED!');
+                } catch (err) {
+                    copyInviteCode();
+                }
+            }
+        }
+
+        // Check for invite code in URL on page load
+        function checkInviteCode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const inviteCode = urlParams.get('invite');
+            if (inviteCode) {
+                // Store for use during signup
+                sessionStorage.setItem('pendingInviteCode', inviteCode);
+                showToast('INVITE_CODE_DETECTED: ' + inviteCode);
+            }
+        }
+
+        // Call on page load
+        document.addEventListener('DOMContentLoaded', checkInviteCode);
 
         // Verification Flow Functions
         function goToStep(stepNumber) {

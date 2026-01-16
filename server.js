@@ -306,6 +306,171 @@ app.get('/api/profile/:userId', (req, res) => {
     res.json(user);
 });
 
+// ============ INVITE/REFERRAL ROUTES ============
+
+// Generate a random invite code
+function generateInviteCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = 'VET-';
+    for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
+// Get week start (Sunday) for invite limit tracking
+function getWeekStart() {
+    const now = new Date();
+    const dayOfWeek = now.getUTCDay();
+    const weekStart = new Date(now);
+    weekStart.setUTCDate(now.getUTCDate() - dayOfWeek);
+    weekStart.setUTCHours(0, 0, 0, 0);
+    return weekStart.toISOString();
+}
+
+// Get user's invites and stats
+app.get('/api/invites/:userId', (req, res) => {
+    const userId = req.params.userId;
+    const weekStart = getWeekStart();
+
+    // Get all invites created by user
+    const invites = db().prepare(`
+        SELECT i.*, u.username as used_by_username
+        FROM invites i
+        LEFT JOIN users u ON i.used_by = u.id
+        WHERE i.created_by = ?
+        ORDER BY i.created_at DESC
+    `).all(userId);
+
+    // Count invites created this week
+    const weeklyCount = db().prepare(`
+        SELECT COUNT(*) as count FROM invites
+        WHERE created_by = ? AND created_at >= ?
+    `).get(userId, weekStart);
+
+    // Count successful referrals (invites that were used)
+    const totalReferrals = db().prepare(`
+        SELECT COUNT(*) as count FROM invites
+        WHERE created_by = ? AND used_by IS NOT NULL
+    `).get(userId);
+
+    res.json({
+        invites,
+        weeklyInvitesUsed: weeklyCount.count,
+        weeklyInvitesRemaining: Math.max(0, 5 - weeklyCount.count),
+        totalReferrals: totalReferrals.count
+    });
+});
+
+// Create a new invite
+app.post('/api/invites', (req, res) => {
+    const { userId } = req.body;
+    const weekStart = getWeekStart();
+
+    // Check weekly limit
+    const weeklyCount = db().prepare(`
+        SELECT COUNT(*) as count FROM invites
+        WHERE created_by = ? AND created_at >= ?
+    `).get(userId, weekStart);
+
+    if (weeklyCount.count >= 5) {
+        return res.status(429).json({
+            error: 'Weekly invite limit reached',
+            remaining: 0
+        });
+    }
+
+    // Generate unique code
+    let code;
+    let attempts = 0;
+    while (attempts < 10) {
+        code = generateInviteCode();
+        const existing = db().prepare('SELECT id FROM invites WHERE code = ?').get(code);
+        if (!existing) break;
+        attempts++;
+    }
+
+    // Set expiration to 7 days from now
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    const result = db().prepare(`
+        INSERT INTO invites (code, created_by, expires_at)
+        VALUES (?, ?, ?)
+    `).run(code, userId, expiresAt.toISOString());
+
+    const invite = db().prepare('SELECT * FROM invites WHERE id = ?').get(result.lastInsertRowid);
+
+    res.json({
+        invite,
+        remaining: 4 - weeklyCount.count
+    });
+});
+
+// Use an invite code (during signup)
+app.post('/api/invites/use', (req, res) => {
+    const { code, userId } = req.body;
+
+    // Find the invite
+    const invite = db().prepare('SELECT * FROM invites WHERE code = ?').get(code.toUpperCase());
+
+    if (!invite) {
+        return res.status(404).json({ error: 'Invalid invite code' });
+    }
+
+    if (invite.used_by) {
+        return res.status(400).json({ error: 'Invite code already used' });
+    }
+
+    if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+        return res.status(400).json({ error: 'Invite code expired' });
+    }
+
+    // Mark invite as used
+    db().prepare(`
+        UPDATE invites SET used_by = ?, used_at = ?
+        WHERE id = ?
+    `).run(userId, new Date().toISOString(), invite.id);
+
+    // Update user's referred_by
+    db().prepare(`
+        UPDATE users SET referred_by = ?
+        WHERE id = ?
+    `).run(invite.created_by, userId);
+
+    // Get referrer info
+    const referrer = db().prepare('SELECT id, username FROM users WHERE id = ?').get(invite.created_by);
+
+    res.json({
+        success: true,
+        referrer
+    });
+});
+
+// Get who referred a user
+app.get('/api/users/:userId/referrer', (req, res) => {
+    const user = db().prepare('SELECT referred_by FROM users WHERE id = ?').get(req.params.userId);
+
+    if (!user || !user.referred_by) {
+        return res.json({ referrer: null });
+    }
+
+    const referrer = db().prepare('SELECT id, username, rank_code, unit FROM users WHERE id = ?').get(user.referred_by);
+    res.json({ referrer });
+});
+
+// Get users referred by a user
+app.get('/api/users/:userId/referrals', (req, res) => {
+    const referrals = db().prepare(`
+        SELECT id, username, rank_code, unit, join_date, created_at
+        FROM users
+        WHERE referred_by = ?
+        ORDER BY created_at DESC
+    `).all(req.params.userId);
+
+    res.json({ referrals, count: referrals.length });
+});
+
 // Serve index.html for all other routes (SPA support)
 app.get('/{*path}', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));

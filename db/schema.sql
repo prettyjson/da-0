@@ -15,7 +15,9 @@ CREATE TABLE IF NOT EXISTS users (
     join_date TEXT,
     is_online INTEGER DEFAULT 0,
     last_dividend REAL DEFAULT 0,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    referred_by INTEGER,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (referred_by) REFERENCES users(id)
 );
 
 -- User badges (awards/decorations)
@@ -115,4 +117,17 @@ CREATE TABLE IF NOT EXISTS network_stats (
     active_nodes INTEGER DEFAULT 0,
     uptime_percentage REAL DEFAULT 99.97,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Invites (referral system)
+CREATE TABLE IF NOT EXISTS invites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    created_by INTEGER NOT NULL,
+    used_by INTEGER,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    used_at TEXT,
+    expires_at TEXT,
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (used_by) REFERENCES users(id)
 );
