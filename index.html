@@ -7,6 +7,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.0/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <!-- LiveKit Client SDK for real-time audio -->
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.6.1/dist/livekit-client.umd.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
         
@@ -3053,6 +3055,197 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
         let netRefreshInterval = null;
         let netChatRefreshInterval = null;
 
+        // LiveKit audio state
+        let livekitRoom = null;
+        let livekitEnabled = false;
+        let localAudioTrack = null;
+        let livekitUrl = '';
+
+        // Check if LiveKit is configured on server
+        async function checkLivekitConfig() {
+            try {
+                const config = await api('/api/livekit/config');
+                livekitEnabled = config.enabled;
+                livekitUrl = config.url;
+                console.log('LiveKit enabled:', livekitEnabled);
+            } catch (err) {
+                console.log('LiveKit not available');
+                livekitEnabled = false;
+            }
+        }
+
+        // Initialize LiveKit check on page load
+        document.addEventListener('DOMContentLoaded', checkLivekitConfig);
+
+        // Connect to LiveKit room
+        async function connectToLiveKitRoom(netId) {
+            if (!livekitEnabled || !window.LivekitClient) {
+                console.log('LiveKit not available, using simulation mode');
+                return false;
+            }
+
+            try {
+                // Get token from server
+                const tokenData = await api(`/api/nets/${netId}/token`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id })
+                });
+
+                if (tokenData.error) {
+                    console.log('Token error:', tokenData.message);
+                    return false;
+                }
+
+                // Create and connect to room
+                livekitRoom = new LivekitClient.Room({
+                    adaptiveStream: true,
+                    dynacast: true,
+                    audioCaptureDefaults: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+
+                // Set up event listeners
+                livekitRoom.on(LivekitClient.RoomEvent.TrackSubscribed, handleTrackSubscribed);
+                livekitRoom.on(LivekitClient.RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+                livekitRoom.on(LivekitClient.RoomEvent.ParticipantConnected, handleParticipantConnected);
+                livekitRoom.on(LivekitClient.RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
+                livekitRoom.on(LivekitClient.RoomEvent.Disconnected, handleRoomDisconnected);
+                livekitRoom.on(LivekitClient.RoomEvent.ActiveSpeakersChanged, handleActiveSpeakers);
+
+                // Connect
+                await livekitRoom.connect(tokenData.url, tokenData.token);
+                console.log('Connected to LiveKit room:', tokenData.room);
+
+                // If we can publish (speaker/host), enable mic
+                if (tokenData.canPublish) {
+                    await enableLocalAudio();
+                }
+
+                showToast('AUDIO_CONNECTED');
+                return true;
+            } catch (err) {
+                console.error('LiveKit connection error:', err);
+                showToast('Audio connection failed - using text only');
+                return false;
+            }
+        }
+
+        // Enable local audio (microphone)
+        async function enableLocalAudio() {
+            if (!livekitRoom) return;
+
+            try {
+                localAudioTrack = await LivekitClient.createLocalAudioTrack({
+                    echoCancellation: true,
+                    noiseSuppression: true
+                });
+                await livekitRoom.localParticipant.publishTrack(localAudioTrack);
+                console.log('Microphone enabled');
+            } catch (err) {
+                console.error('Error enabling microphone:', err);
+                showToast('MICROPHONE_ERROR: Check permissions');
+            }
+        }
+
+        // Disable local audio
+        async function disableLocalAudio() {
+            if (localAudioTrack) {
+                await livekitRoom?.localParticipant.unpublishTrack(localAudioTrack);
+                localAudioTrack.stop();
+                localAudioTrack = null;
+            }
+        }
+
+        // Handle incoming audio tracks
+        function handleTrackSubscribed(track, publication, participant) {
+            if (track.kind === 'audio') {
+                const audioElement = track.attach();
+                audioElement.id = `audio-${participant.identity}`;
+                document.body.appendChild(audioElement);
+                console.log('Audio track subscribed:', participant.identity);
+            }
+        }
+
+        // Handle track unsubscribe
+        function handleTrackUnsubscribed(track, publication, participant) {
+            if (track.kind === 'audio') {
+                track.detach().forEach(el => el.remove());
+                const audioEl = document.getElementById(`audio-${participant.identity}`);
+                if (audioEl) audioEl.remove();
+            }
+        }
+
+        // Handle new participant
+        function handleParticipantConnected(participant) {
+            console.log('Participant joined:', participant.identity);
+        }
+
+        // Handle participant leaving
+        function handleParticipantDisconnected(participant) {
+            console.log('Participant left:', participant.identity);
+            const audioEl = document.getElementById(`audio-${participant.identity}`);
+            if (audioEl) audioEl.remove();
+        }
+
+        // Handle room disconnect
+        function handleRoomDisconnected() {
+            console.log('Disconnected from LiveKit room');
+            cleanupLiveKit();
+        }
+
+        // Handle active speakers (visual indicator)
+        function handleActiveSpeakers(speakers) {
+            // Update UI to show who's speaking
+            document.querySelectorAll('.speaker-card').forEach(card => {
+                card.classList.remove('speaking');
+            });
+
+            speakers.forEach(speaker => {
+                const speakerCards = document.querySelectorAll('.speaker-card');
+                speakerCards.forEach(card => {
+                    if (card.querySelector('.speaker-name')?.textContent === speaker.identity) {
+                        card.classList.add('speaking');
+                    }
+                });
+            });
+        }
+
+        // Cleanup LiveKit connection
+        function cleanupLiveKit() {
+            if (localAudioTrack) {
+                localAudioTrack.stop();
+                localAudioTrack = null;
+            }
+            if (livekitRoom) {
+                livekitRoom.disconnect();
+                livekitRoom = null;
+            }
+            // Remove all audio elements
+            document.querySelectorAll('[id^="audio-"]').forEach(el => el.remove());
+        }
+
+        // Refresh token when role changes (approved to speak)
+        async function refreshLiveKitToken() {
+            if (!livekitEnabled || !livekitRoom || !currentNetId) return;
+
+            try {
+                const tokenData = await api(`/api/nets/${currentNetId}/refresh-token`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id })
+                });
+
+                if (tokenData.canPublish && !localAudioTrack) {
+                    await enableLocalAudio();
+                    showToast('MIC_ENABLED - You can now speak!');
+                }
+            } catch (err) {
+                console.error('Error refreshing token:', err);
+            }
+        }
+
         // Load all live nets
         async function loadNets() {
             try {
@@ -3186,6 +3379,9 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 await loadNetRoom();
                 document.getElementById('net-popup').classList.add('show');
 
+                // Connect to LiveKit for real audio
+                await connectToLiveKitRoom(netId);
+
                 // Start auto-refresh
                 netRefreshInterval = setInterval(loadNetRoom, 5000);
                 netChatRefreshInterval = setInterval(loadNetChat, 3000);
@@ -3194,6 +3390,9 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 showToast('Error joining net');
             }
         }
+
+        // Track previous role for token refresh
+        let previousNetRole = null;
 
         // Load net room data
         async function loadNetRoom() {
@@ -3211,6 +3410,14 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 const myParticipant = net.participants.find(p => p.user_id === currentUser.id);
                 const myRole = myParticipant?.role || 'listener';
                 const isHost = myRole === 'host' || myRole === 'co-host';
+
+                // Check if role upgraded to speaker - need to refresh token for mic access
+                const canSpeak = ['host', 'co-host', 'speaker'].includes(myRole);
+                const couldSpeakBefore = ['host', 'co-host', 'speaker'].includes(previousNetRole);
+                if (canSpeak && !couldSpeakBefore && livekitRoom && !localAudioTrack) {
+                    await refreshLiveKitToken();
+                }
+                previousNetRole = myRole;
 
                 // Render speakers
                 const speakers = net.participants.filter(p => ['host', 'co-host', 'speaker'].includes(p.role));
@@ -3341,10 +3548,20 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             if (!currentNetId || !currentUser) return;
 
             try {
-                await api(`/api/nets/${currentNetId}/toggle-mute`, {
+                const result = await api(`/api/nets/${currentNetId}/toggle-mute`, {
                     method: 'POST',
                     body: JSON.stringify({ userId: currentUser.id })
                 });
+
+                // Also mute/unmute actual LiveKit audio
+                if (localAudioTrack && livekitRoom) {
+                    if (result.is_muted) {
+                        await livekitRoom.localParticipant.setMicrophoneEnabled(false);
+                    } else {
+                        await livekitRoom.localParticipant.setMicrophoneEnabled(true);
+                    }
+                }
+
                 await loadNetRoom();
             } catch (err) {
                 showToast('Error toggling mute');
@@ -3457,6 +3674,10 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             document.getElementById('net-popup').classList.remove('show');
             currentNetId = null;
             currentNetData = null;
+            previousNetRole = null;
+
+            // Disconnect from LiveKit
+            cleanupLiveKit();
 
             // Clear intervals
             if (netRefreshInterval) {
