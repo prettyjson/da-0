@@ -561,7 +561,7 @@ app.get('/api/nets/:id', (req, res) => {
     res.json(net);
 });
 
-// Join a net as listener
+// Join a net as listener (or reclaim host role if original host)
 app.post('/api/nets/:id/join', (req, res) => {
     const { userId } = req.body;
     const netId = req.params.id;
@@ -575,21 +575,29 @@ app.post('/api/nets/:id/join', (req, res) => {
         return res.json({ success: true, participant: existing, message: 'Already in net' });
     }
 
+    // Check if user is the original host of this net
+    const net = db().prepare('SELECT * FROM nets WHERE id = ?').get(netId);
+    const isOriginalHost = net && net.host_id === userId;
+
     // Check if was in net before (rejoin)
     const previous = db().prepare(`
         SELECT * FROM net_participants WHERE net_id = ? AND user_id = ?
     `).get(netId, userId);
 
+    // Determine role: original host reclaims host role, others join as listener
+    const role = isOriginalHost ? 'host' : 'listener';
+    const isMuted = isOriginalHost ? 0 : 1;
+
     if (previous) {
         db().prepare(`
-            UPDATE net_participants SET left_at = NULL, joined_at = ?, role = 'listener'
+            UPDATE net_participants SET left_at = NULL, joined_at = ?, role = ?, is_muted = ?
             WHERE net_id = ? AND user_id = ?
-        `).run(new Date().toISOString(), netId, userId);
+        `).run(new Date().toISOString(), role, isMuted, netId, userId);
     } else {
         db().prepare(`
             INSERT INTO net_participants (net_id, user_id, role, is_muted)
-            VALUES (?, ?, 'listener', 1)
-        `).run(netId, userId);
+            VALUES (?, ?, ?, ?)
+        `).run(netId, userId, role, isMuted);
     }
 
     const participant = db().prepare(`
@@ -598,7 +606,7 @@ app.post('/api/nets/:id/join', (req, res) => {
         WHERE np.net_id = ? AND np.user_id = ?
     `).get(netId, userId);
 
-    res.json({ success: true, participant });
+    res.json({ success: true, participant, hostReclaimed: isOriginalHost });
 });
 
 // Leave a net
@@ -714,6 +722,16 @@ app.post('/api/nets/:id/approve-speaker', (req, res) => {
 
     if (!participant) {
         return res.status(403).json({ error: 'Only hosts can approve speakers' });
+    }
+
+    // Check max speakers limit (10)
+    const speakerCount = db().prepare(`
+        SELECT COUNT(*) as count FROM net_participants
+        WHERE net_id = ? AND role IN ('host', 'co-host', 'speaker') AND left_at IS NULL
+    `).get(netId);
+
+    if (speakerCount.count >= 10) {
+        return res.status(400).json({ error: 'Maximum 10 speakers allowed. Demote someone first.' });
     }
 
     // Update speak request

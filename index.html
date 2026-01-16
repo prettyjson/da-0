@@ -829,6 +829,133 @@
             flex-direction: column;
         }
 
+        /* Mini player for minimized net */
+        .net-mini-player {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 320px;
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid #00ff41;
+            border-radius: 8px;
+            z-index: 999;
+            display: none;
+            flex-direction: column;
+            box-shadow: 0 4px 20px rgba(0, 255, 65, 0.3);
+        }
+
+        .net-mini-player.show {
+            display: flex;
+        }
+
+        .mini-player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            background: rgba(0, 255, 65, 0.1);
+            border-bottom: 1px solid #00ff41;
+            cursor: pointer;
+        }
+
+        .mini-player-title {
+            font-size: 11px;
+            font-weight: bold;
+            color: #00ff41;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mini-player-live {
+            background: #ff0000;
+            color: #fff;
+            padding: 1px 5px;
+            font-size: 8px;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+
+        .mini-player-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .mini-player-btn {
+            background: transparent;
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mini-player-btn:hover {
+            background: rgba(0, 255, 65, 0.2);
+        }
+
+        .mini-player-btn.danger {
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+
+        .mini-player-body {
+            padding: 10px 12px;
+        }
+
+        .mini-player-speakers {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .mini-speaker {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            padding: 3px 8px;
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid #004d15;
+        }
+
+        .mini-speaker.speaking {
+            border-color: #00ff41;
+            box-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
+        }
+
+        .mini-player-stats {
+            font-size: 9px;
+            color: #666;
+        }
+
+        .mini-player-mute {
+            width: 100%;
+            padding: 8px;
+            margin-top: 8px;
+            background: transparent;
+            border: 1px solid;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .mini-player-mute.muted {
+            border-color: #00ff41;
+            color: #00ff41;
+        }
+
+        .mini-player-mute.unmuted {
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+
         .net-header {
             border-bottom: 2px solid #00ff41;
             padding: 15px 20px;
@@ -2338,6 +2465,7 @@ AUG  $24.9M  ██████████████████████�
             </div>
             <div class="net-status">
                 <span class="net-live-badge">LIVE</span>
+                <button class="mini-player-btn" onclick="minimizeNet()" title="Minimize">−</button>
                 <button class="profile-close" onclick="closeNetRoom()">×</button>
             </div>
         </div>
@@ -2409,6 +2537,31 @@ AUG  $24.9M  ██████████████████████�
 
             <button class="btn-primary" onclick="createNet()">GO_LIVE</button>
             <button class="btn-secondary" onclick="closeCreateNetModal()">CANCEL</button>
+        </div>
+    </div>
+
+    <!-- Net Mini Player (minimized view) -->
+    <div class="net-mini-player" id="net-mini-player">
+        <div class="mini-player-header" onclick="expandNet()">
+            <div class="mini-player-title">
+                <span class="mini-player-live">LIVE</span>
+                <span id="mini-player-name">NET_NAME</span>
+            </div>
+            <div class="mini-player-controls">
+                <button class="mini-player-btn" onclick="event.stopPropagation(); expandNet()" title="Expand">⤢</button>
+                <button class="mini-player-btn danger" onclick="event.stopPropagation(); leaveNet()" title="Leave">×</button>
+            </div>
+        </div>
+        <div class="mini-player-body">
+            <div class="mini-player-speakers" id="mini-player-speakers">
+                <!-- Speakers will be shown here -->
+            </div>
+            <div class="mini-player-stats" id="mini-player-stats">
+                0 speakers · 0 listeners
+            </div>
+            <button class="mini-player-mute muted" id="mini-player-mute" onclick="toggleMute()">
+                🎤 UNMUTE
+            </button>
         </div>
     </div>
 
@@ -3290,18 +3443,24 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
 
                 if (!stagesContainer) return;
 
-                stagesContainer.innerHTML = '<div style="font-weight: bold; margin-bottom: 15px; color: #00ff41;">LIVE_NETS</div>';
+                // Clear and rebuild (avoid innerHTML += which destroys event handlers)
+                stagesContainer.innerHTML = '';
+
+                const header = document.createElement('div');
+                header.style.cssText = 'font-weight: bold; margin-bottom: 15px; color: #00ff41;';
+                header.textContent = 'LIVE_NETS';
+                stagesContainer.appendChild(header);
 
                 if (nets.length === 0) {
-                    stagesContainer.innerHTML += `
-                        <div style="text-align: center; color: #666; padding: 20px;">
-                            <div>No live nets</div>
-                        </div>
-                    `;
+                    const emptyMsg = document.createElement('div');
+                    emptyMsg.style.cssText = 'text-align: center; color: #666; padding: 20px;';
+                    emptyMsg.innerHTML = '<div>No live nets</div>';
+                    stagesContainer.appendChild(emptyMsg);
                 } else {
                     nets.slice(0, 4).forEach(net => {
                         const stageItem = document.createElement('div');
                         stageItem.className = 'stage-item';
+                        stageItem.style.cursor = 'pointer';
                         stageItem.onclick = () => joinNet(net.id);
                         stageItem.innerHTML = `
                             <span class="live-indicator">●</span>
@@ -3312,11 +3471,16 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                     });
                 }
 
-                stagesContainer.innerHTML += `
-                    <div style="margin-top: 15px;">
-                        <button class="btn-primary" style="font-size: 10px; padding: 8px;" onclick="showCreateNetModal()">+ START_NET</button>
-                    </div>
-                `;
+                // Add button as DOM element to preserve event handlers
+                const buttonContainer = document.createElement('div');
+                buttonContainer.style.marginTop = '15px';
+                const startButton = document.createElement('button');
+                startButton.className = 'btn-primary';
+                startButton.style.cssText = 'font-size: 10px; padding: 8px;';
+                startButton.textContent = '+ START_NET';
+                startButton.onclick = showCreateNetModal;
+                buttonContainer.appendChild(startButton);
+                stagesContainer.appendChild(buttonContainer);
             } catch (err) {
                 console.error('Error loading nets in overview:', err);
             }
@@ -3461,6 +3625,11 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 // Render controls based on role
                 renderNetControls(myRole, myParticipant?.is_muted);
 
+                // Also update mini player if it's visible
+                if (document.getElementById('net-mini-player').classList.contains('show')) {
+                    updateMiniPlayer();
+                }
+
             } catch (err) {
                 console.error('Error loading net room:', err);
             }
@@ -3588,12 +3757,17 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             if (!currentNetId || !currentUser) return;
 
             try {
-                await api(`/api/nets/${currentNetId}/approve-speaker`, {
+                const result = await api(`/api/nets/${currentNetId}/approve-speaker`, {
                     method: 'POST',
                     body: JSON.stringify({ userId: currentUser.id, targetUserId, requestId })
                 });
-                showToast('Speaker approved');
-                await loadNetRoom();
+
+                if (result.error) {
+                    showToast(result.error);
+                } else {
+                    showToast('Speaker approved');
+                    await loadNetRoom();
+                }
             } catch (err) {
                 showToast('Error approving speaker');
             }
@@ -3672,6 +3846,7 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
         // Close net room popup
         function closeNetRoom() {
             document.getElementById('net-popup').classList.remove('show');
+            document.getElementById('net-mini-player').classList.remove('show');
             currentNetId = null;
             currentNetData = null;
             previousNetRole = null;
@@ -3687,6 +3862,68 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             if (netChatRefreshInterval) {
                 clearInterval(netChatRefreshInterval);
                 netChatRefreshInterval = null;
+            }
+        }
+
+        // Minimize net to mini player
+        function minimizeNet() {
+            if (!currentNetData) return;
+
+            // Hide full popup
+            document.getElementById('net-popup').classList.remove('show');
+
+            // Update and show mini player
+            document.getElementById('mini-player-name').textContent = currentNetData.name;
+            updateMiniPlayer();
+            document.getElementById('net-mini-player').classList.add('show');
+
+            showToast('Net minimized - tap to expand');
+        }
+
+        // Expand from mini player to full popup
+        function expandNet() {
+            document.getElementById('net-mini-player').classList.remove('show');
+            document.getElementById('net-popup').classList.add('show');
+        }
+
+        // Update mini player display
+        function updateMiniPlayer() {
+            if (!currentNetData) return;
+
+            const speakers = currentNetData.participants?.filter(p =>
+                ['host', 'co-host', 'speaker'].includes(p.role)
+            ) || [];
+            const listeners = currentNetData.participants?.filter(p => p.role === 'listener') || [];
+
+            // Update speakers display
+            const speakersEl = document.getElementById('mini-player-speakers');
+            speakersEl.innerHTML = speakers.slice(0, 4).map(s => `
+                <span class="mini-speaker">${s.is_muted ? '🔇' : '🎤'} ${s.username}</span>
+            `).join('');
+
+            if (speakers.length > 4) {
+                speakersEl.innerHTML += `<span class="mini-speaker">+${speakers.length - 4}</span>`;
+            }
+
+            // Update stats
+            document.getElementById('mini-player-stats').textContent =
+                `${speakers.length} speaker${speakers.length !== 1 ? 's' : ''} · ${listeners.length} listener${listeners.length !== 1 ? 's' : ''}`;
+
+            // Update mute button based on current user's state
+            const myParticipant = currentNetData.participants?.find(p => p.user_id === currentUser?.id);
+            const muteBtn = document.getElementById('mini-player-mute');
+
+            if (myParticipant && ['host', 'co-host', 'speaker'].includes(myParticipant.role)) {
+                muteBtn.style.display = 'block';
+                if (myParticipant.is_muted) {
+                    muteBtn.className = 'mini-player-mute muted';
+                    muteBtn.textContent = '🎤 UNMUTE';
+                } else {
+                    muteBtn.className = 'mini-player-mute unmuted';
+                    muteBtn.textContent = '🔇 MUTE';
+                }
+            } else {
+                muteBtn.style.display = 'none';
             }
         }
 
