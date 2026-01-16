@@ -2627,6 +2627,13 @@ AUG  $24.9M  ██████████████████████�
 
                     if (result.success) {
                         currentUser = result.user;
+
+                        // Save session to localStorage for persistence
+                        localStorage.setItem('vetnet_session', JSON.stringify({
+                            userId: currentUser.id,
+                            username: currentUser.username
+                        }));
+
                         document.getElementById('auth-screen').classList.add('hidden');
                         document.getElementById('main-app').classList.add('active');
                         document.getElementById('current-user').textContent = currentUser.username;
@@ -2642,6 +2649,37 @@ AUG  $24.9M  ██████████████████████�
                 alert('Please enter username and password');
             }
         }
+
+        // Check for saved session on page load
+        async function checkSavedSession() {
+            const saved = localStorage.getItem('vetnet_session');
+            if (saved) {
+                try {
+                    const session = JSON.parse(saved);
+                    // Re-authenticate with saved username
+                    const result = await api('/api/auth/login', {
+                        method: 'POST',
+                        body: JSON.stringify({ username: session.username, password: 'auto' })
+                    });
+
+                    if (result.success) {
+                        currentUser = result.user;
+                        document.getElementById('auth-screen').classList.add('hidden');
+                        document.getElementById('main-app').classList.add('active');
+                        document.getElementById('current-user').textContent = currentUser.username;
+                        await loadAllData();
+                        return true;
+                    }
+                } catch (err) {
+                    console.error('Session restore failed:', err);
+                    localStorage.removeItem('vetnet_session');
+                }
+            }
+            return false;
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', checkSavedSession);
 
         async function startVerification() {
             const email = document.getElementById('signup-email').value;
@@ -2667,6 +2705,10 @@ AUG  $24.9M  ██████████████████████�
                     });
                 }
                 currentUser = null;
+
+                // Clear saved session
+                localStorage.removeItem('vetnet_session');
+
                 document.getElementById('main-app').classList.remove('active');
                 document.getElementById('auth-screen').classList.remove('hidden');
                 document.getElementById('login-username').value = '';
