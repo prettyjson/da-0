@@ -2,9 +2,15 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { initDatabase, getDatabase } = require('./db/init');
+const { AccessToken } = require('livekit-server-sdk');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// LiveKit configuration (set these in your environment)
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || '';
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || '';
+const LIVEKIT_URL = process.env.LIVEKIT_URL || '';
 
 // Initialize database
 initDatabase();
@@ -832,6 +838,125 @@ app.post('/api/nets/:id/messages', (req, res) => {
     `).get(result.lastInsertRowid);
 
     res.json(message);
+});
+
+// ============ LIVEKIT TOKEN ROUTES ============
+
+// Get LiveKit connection info (for frontend)
+app.get('/api/livekit/config', (req, res) => {
+    res.json({
+        enabled: !!(LIVEKIT_API_KEY && LIVEKIT_API_SECRET && LIVEKIT_URL),
+        url: LIVEKIT_URL
+    });
+});
+
+// Generate LiveKit token for joining a net
+app.post('/api/nets/:id/token', async (req, res) => {
+    const { userId } = req.body;
+    const netId = req.params.id;
+
+    // Check if LiveKit is configured
+    if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+        return res.status(503).json({
+            error: 'Audio not configured',
+            message: 'LiveKit credentials not set. Audio will be simulated.'
+        });
+    }
+
+    // Get user info
+    const user = db().prepare('SELECT * FROM users WHERE id = ?').get(userId);
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get participant info to determine permissions
+    const participant = db().prepare(`
+        SELECT * FROM net_participants WHERE net_id = ? AND user_id = ? AND left_at IS NULL
+    `).get(netId, userId);
+
+    if (!participant) {
+        return res.status(403).json({ error: 'Must join net first' });
+    }
+
+    // Determine permissions based on role
+    const canPublish = ['host', 'co-host', 'speaker'].includes(participant.role);
+    const canSubscribe = true; // Everyone can listen
+
+    try {
+        // Create access token
+        const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+            identity: user.username,
+            name: user.username,
+            metadata: JSON.stringify({
+                rank: user.rank_code,
+                unit: user.unit,
+                role: participant.role
+            })
+        });
+
+        // Add video grant for the specific room (net)
+        at.addGrant({
+            room: `net-${netId}`,
+            roomJoin: true,
+            canPublish: canPublish,
+            canSubscribe: canSubscribe,
+            canPublishData: true // For any data channel needs
+        });
+
+        const token = await at.toJwt();
+
+        res.json({
+            token,
+            url: LIVEKIT_URL,
+            room: `net-${netId}`,
+            canPublish,
+            identity: user.username
+        });
+    } catch (error) {
+        console.error('LiveKit token error:', error);
+        res.status(500).json({ error: 'Failed to generate token' });
+    }
+});
+
+// Update token when role changes (e.g., approved to speak)
+app.post('/api/nets/:id/refresh-token', async (req, res) => {
+    const { userId } = req.body;
+    const netId = req.params.id;
+
+    if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+        return res.status(503).json({ error: 'Audio not configured' });
+    }
+
+    const user = db().prepare('SELECT * FROM users WHERE id = ?').get(userId);
+    const participant = db().prepare(`
+        SELECT * FROM net_participants WHERE net_id = ? AND user_id = ? AND left_at IS NULL
+    `).get(netId, userId);
+
+    if (!user || !participant) {
+        return res.status(404).json({ error: 'Not found' });
+    }
+
+    const canPublish = ['host', 'co-host', 'speaker'].includes(participant.role);
+
+    try {
+        const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+            identity: user.username,
+            name: user.username
+        });
+
+        at.addGrant({
+            room: `net-${netId}`,
+            roomJoin: true,
+            canPublish: canPublish,
+            canSubscribe: true,
+            canPublishData: true
+        });
+
+        const token = await at.toJwt();
+        res.json({ token, canPublish });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to refresh token' });
+    }
 });
 
 // Serve index.html for all other routes (SPA support)
