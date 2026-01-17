@@ -3777,9 +3777,6 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 <div class="message-reactions" id="reactions-${msg.id}"></div>
             `;
 
-            // Always render reactions container (will show "+" button even if no reactions)
-            renderReactions(msg.id, msg.reactions || {});
-
             // Add right-click handler
             messageDiv.addEventListener('contextmenu', function(e) {
                 e.preventDefault();
@@ -3807,6 +3804,9 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 container = document.getElementById('chat-messages');
             }
             container.appendChild(messageDiv);
+
+            // Render reactions AFTER the message is in the DOM
+            renderReactions(msg.id, msg.reactions || {});
         }
 
         async function sendMessage() {
@@ -4026,7 +4026,7 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             picker.innerHTML = '';
 
             // Available reaction emojis
-            const emojis = ['👍', '👎', '😊', '😅', '😂', '🔫', '💥', '🔥'];
+            const emojis = ['👍', '👎', '😊', '🤮', '😅', '😂', '🔫', '💥', '🔥'];
 
             // Create emoji buttons with proper event handling
             emojis.forEach(emoji => {
