@@ -5182,7 +5182,22 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
 
         // Cancel verification flow and return to login
         async function cancelVerification() {
-            const confirmed = await showTerminalConfirm('Exit verification process? Your progress will be lost.');
+            // Use custom modal with clearer button labels
+            const modal = document.getElementById('terminal-modal');
+            const messageDiv = document.getElementById('terminal-modal-message');
+            const buttonsDiv = document.getElementById('terminal-modal-buttons');
+
+            const confirmPromise = new Promise((resolve) => {
+                terminalModalResolve = resolve;
+                messageDiv.textContent = 'Exit verification process? Your progress will be lost.';
+                buttonsDiv.innerHTML = `
+                    <button onclick="closeTerminalModal(false)" style="padding: 8px 20px; background: rgba(0, 255, 65, 0.1); border: 1px solid #00ff41; color: #00ff41; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px;">STAY</button>
+                    <button onclick="closeTerminalModal(true)" style="padding: 8px 20px; background: rgba(255, 0, 0, 0.1); border: 1px solid #ff0000; color: #ff0000; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px;">EXIT</button>
+                `;
+                modal.style.display = 'flex';
+            });
+
+            const confirmed = await confirmPromise;
             if (!confirmed) return;
 
             // Reset to step 1
