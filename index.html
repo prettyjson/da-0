@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
     <title>VETNET_TERMINAL_v2.1.3</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.0/dist/tesseract.min.js"></script>
@@ -54,6 +57,12 @@
 
             /* Touch targets (mobile) */
             --touch-target-min: 44px;
+
+            /* Safe area insets for iPhone notch/home indicator */
+            --safe-area-inset-top: env(safe-area-inset-top);
+            --safe-area-inset-right: env(safe-area-inset-right);
+            --safe-area-inset-bottom: env(safe-area-inset-bottom);
+            --safe-area-inset-left: env(safe-area-inset-left);
         }
 
         * {
@@ -67,9 +76,14 @@
             background: var(--bg-dark);
             color: var(--primary-color);
             min-height: 100vh;
-            overflow-x: auto;
+            overflow-x: hidden;
             font-size: var(--font-base);
-            line-height: 1.4;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            -webkit-overflow-scrolling: touch;
+            padding-left: var(--safe-area-inset-left);
+            padding-right: var(--safe-area-inset-right);
         }
 
         /* Auth Screen Styles */
@@ -79,6 +93,8 @@
             justify-content: center;
             min-height: 100vh;
             padding: 20px;
+            padding-top: calc(20px + var(--safe-area-inset-top));
+            padding-bottom: calc(20px + var(--safe-area-inset-bottom));
         }
 
         .auth-box {
@@ -825,7 +841,7 @@
         /* Tablet and below */
         @media (max-width: 768px) {
             body {
-                font-size: 11px;
+                font-size: 12px;
             }
 
             /* Stack main grid */
@@ -861,11 +877,13 @@
                 flex: 1 1 auto;
                 min-width: 100px;
                 padding: var(--spacing-sm) var(--spacing-md);
+                min-height: var(--touch-target-min);
             }
 
             /* Terminal header */
             .terminal-header {
                 padding: var(--spacing-sm);
+                padding-top: calc(var(--spacing-sm) + var(--safe-area-inset-top));
             }
 
             .header-line {
@@ -879,32 +897,36 @@
             }
         }
 
-        /* Mobile phones */
+        /* Mobile phones - iPhone optimized */
         @media (max-width: 480px) {
             body {
-                font-size: var(--font-xs);
-                padding: 0;
+                font-size: 11px;
+                padding-left: var(--safe-area-inset-left);
+                padding-right: var(--safe-area-inset-right);
                 overflow-x: hidden;
                 word-wrap: break-word;
             }
 
             /* Reduce padding globally */
             .terminal-container {
-                padding: var(--spacing-sm);
+                padding: var(--spacing-md);
+                padding-top: calc(var(--spacing-md) + var(--safe-area-inset-top));
+                padding-bottom: calc(var(--spacing-md) + var(--safe-area-inset-bottom));
             }
 
             /* Stack all grids to single column */
             .main-grid,
             .treasury-grid {
                 grid-template-columns: 1fr;
-                gap: var(--spacing-sm);
+                gap: var(--spacing-md);
             }
 
             /* Mobile-friendly table */
             .table-row {
-                grid-template-columns: 30px 1fr 60px;
-                font-size: var(--font-xs);
-                padding: 6px 0;
+                grid-template-columns: 35px 1fr 70px;
+                font-size: 11px;
+                padding: 8px 0;
+                min-height: var(--touch-target-min);
             }
 
             /* Hide even more columns on mobile */
@@ -916,7 +938,7 @@
             /* Navigation stack */
             .nav-tabs {
                 flex-direction: column;
-                gap: var(--spacing-xs);
+                gap: var(--spacing-sm);
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
             }
@@ -924,9 +946,11 @@
             .nav-tab {
                 width: 100%;
                 min-height: var(--touch-target-min);
-                padding: var(--spacing-md) var(--spacing-sm);
+                padding: var(--spacing-md);
                 text-align: left;
-                font-size: var(--font-sm);
+                font-size: 12px;
+                display: flex;
+                align-items: center;
             }
 
             /* Logout button on mobile */
@@ -937,28 +961,38 @@
 
             /* Header improvements */
             .terminal-header {
-                padding: var(--spacing-xs);
-                font-size: var(--font-xs);
+                padding: var(--spacing-sm);
+                padding-top: calc(var(--spacing-sm) + var(--safe-area-inset-top));
+                font-size: 10px;
             }
 
             .header-line {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: var(--spacing-xs);
+                gap: 4px;
             }
 
             /* Auth screen mobile */
             .auth-container {
-                padding: var(--spacing-sm);
+                padding: var(--spacing-md);
+                padding-top: calc(var(--spacing-md) + var(--safe-area-inset-top));
+                padding-bottom: calc(var(--spacing-md) + var(--safe-area-inset-bottom));
             }
 
             .auth-box {
-                padding: var(--spacing-lg);
-                border-width: var(--border-width);
+                padding: var(--spacing-xl);
+                border-width: var(--border-width-md);
+                box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
             }
 
             .auth-logo {
-                font-size: var(--font-xl);
+                font-size: 28px;
+                margin-bottom: 15px;
+            }
+
+            .auth-subtitle {
+                font-size: 11px;
+                margin-bottom: 25px;
             }
 
             /* Forms touch-friendly */
@@ -966,7 +1000,13 @@
             .btn-primary,
             .btn-secondary {
                 min-height: var(--touch-target-min);
-                font-size: var(--font-base);
+                font-size: 14px;
+                padding: 14px;
+            }
+
+            .form-label {
+                font-size: 11px;
+                margin-bottom: 8px;
             }
 
             /* Stats sections */
@@ -976,8 +1016,125 @@
             .treasury-box,
             .chart-container,
             .votes-section {
-                padding: var(--spacing-sm);
-                margin-bottom: var(--spacing-sm);
+                padding: var(--spacing-md);
+                margin-bottom: var(--spacing-md);
+            }
+
+            /* Verification container */
+            .verification-container {
+                padding: var(--spacing-md);
+                padding-top: calc(var(--spacing-md) + var(--safe-area-inset-top));
+                padding-bottom: calc(var(--spacing-md) + var(--safe-area-inset-bottom));
+            }
+
+            .verification-header {
+                padding: var(--spacing-md);
+                margin-bottom: var(--spacing-md);
+            }
+
+            .verification-step {
+                padding: var(--spacing-md);
+            }
+
+            .step-title {
+                font-size: 14px;
+                margin-bottom: var(--spacing-md);
+            }
+
+            .step-description {
+                font-size: 11px;
+                line-height: 1.6;
+            }
+
+            /* File upload areas */
+            .file-upload {
+                padding: var(--spacing-xl);
+                min-height: 140px;
+            }
+
+            .upload-icon {
+                font-size: 48px;
+            }
+
+            .upload-text {
+                font-size: 12px;
+            }
+
+            .upload-subtext {
+                font-size: 10px;
+            }
+
+            /* Toast notifications on mobile */
+            .toast {
+                bottom: calc(80px + var(--safe-area-inset-bottom));
+                max-width: calc(100% - 40px);
+                padding: 14px 20px;
+                font-size: 12px;
+            }
+
+            /* Net popup mobile */
+            .net-popup {
+                padding-top: var(--safe-area-inset-top);
+                padding-bottom: var(--safe-area-inset-bottom);
+            }
+
+            /* Mini player mobile */
+            .net-mini-player {
+                bottom: calc(80px + var(--safe-area-inset-bottom));
+                right: 10px;
+                width: calc(100% - 20px);
+                max-width: 340px;
+            }
+
+            /* Modal dialogs */
+            .modal-content {
+                max-width: calc(100% - 20px);
+                margin: 10px;
+            }
+        }
+
+        /* Small phones (iPhone SE, etc) */
+        @media (max-width: 375px) {
+            body {
+                font-size: 11px;
+            }
+
+            .auth-logo {
+                font-size: 24px;
+            }
+
+            .auth-box {
+                padding: var(--spacing-lg);
+            }
+
+            .nav-tab {
+                font-size: 11px;
+                padding: 12px;
+            }
+
+            .table-row {
+                font-size: 10px;
+            }
+        }
+
+        /* Large phones (iPhone Pro Max, etc) - optimize for larger screens */
+        @media (min-width: 390px) and (max-width: 480px) {
+            body {
+                font-size: 12px;
+            }
+
+            .auth-logo {
+                font-size: 32px;
+            }
+
+            .nav-tab {
+                font-size: 13px;
+            }
+
+            .form-input,
+            .btn-primary,
+            .btn-secondary {
+                font-size: 15px;
             }
         }
 
@@ -1837,37 +1994,25 @@
             .speaker-name {
                 font-size: 9px;
             }
-        }
 
-        @media (max-width: 480px) {
-            .auth-logo {
-                font-size: 20px;
+            /* Net control buttons touch friendly */
+            .net-control-btn {
+                min-height: var(--touch-target-min);
             }
 
-            .nav-tabs {
-                gap: 5px;
+            /* Profile popup safe areas */
+            .profile-popup {
+                padding-top: var(--safe-area-inset-top);
+                padding-bottom: var(--safe-area-inset-bottom);
             }
 
-            .nav-tab {
-                padding: 6px 8px;
-                font-size: 9px;
-            }
-
-            .table-row {
-                grid-template-columns: 35px 100px 70px 50px 40px;
-                font-size: 9px;
-            }
-
-            .ascii-chart {
-                display: none;
-            }
-
-            .chart-container::after {
-                content: '[Chart optimized for desktop view]';
-                color: #666;
-                font-size: 10px;
+            /* System info safe bottom */
+            .system-info {
+                bottom: calc(5px + var(--safe-area-inset-bottom));
             }
         }
+
+        /* Additional mobile refinements covered in main mobile section above */
     </style>
 </head>
 <body>
@@ -3585,7 +3730,15 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 return false;
             }
 
+            // If already connected to this room, don't reconnect
+            if (livekitRoom && livekitRoom.state === 'connected') {
+                console.log('Already connected to LiveKit room');
+                return true;
+            }
+
             try {
+                console.log('Connecting to LiveKit room for net:', netId);
+
                 // Get token from server
                 const tokenData = await api(`/api/nets/${netId}/token`, {
                     method: 'POST',
@@ -3596,6 +3749,8 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                     console.log('Token error:', tokenData.message);
                     return false;
                 }
+
+                console.log('Token received. Can publish:', tokenData.canPublish);
 
                 // Create and connect to room
                 livekitRoom = new LivekitClient.Room({
@@ -3618,17 +3773,35 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
 
                 // Connect
                 await livekitRoom.connect(tokenData.url, tokenData.token);
-                console.log('Connected to LiveKit room:', tokenData.room);
+                console.log('✓ Connected to LiveKit room:', tokenData.room);
+                console.log('Room state:', livekitRoom.state);
+                console.log('Remote participants:', livekitRoom.remoteParticipants.size);
+
+                // Handle existing participants and their tracks
+                livekitRoom.remoteParticipants.forEach(participant => {
+                    console.log('Found existing participant:', participant.identity);
+
+                    // Subscribe to existing audio tracks
+                    participant.audioTrackPublications.forEach(publication => {
+                        console.log(`  - Audio track publication:`, publication.trackSid, 'subscribed:', publication.isSubscribed);
+                        if (publication.isSubscribed && publication.audioTrack) {
+                            handleTrackSubscribed(publication.audioTrack, publication, participant);
+                        }
+                    });
+                });
 
                 // If we can publish (speaker/host), enable mic
                 if (tokenData.canPublish) {
+                    console.log('User can publish - enabling microphone');
                     await enableLocalAudio();
+                } else {
+                    console.log('User is listener only');
                 }
 
                 showToast('AUDIO_CONNECTED');
                 return true;
             } catch (err) {
-                console.error('LiveKit connection error:', err);
+                console.error('✗ LiveKit connection error:', err);
                 showToast('Audio connection failed - using text only');
                 return false;
             }
@@ -3636,37 +3809,89 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
 
         // Enable local audio (microphone)
         async function enableLocalAudio() {
-            if (!livekitRoom) return;
+            if (!livekitRoom) {
+                console.error('Cannot enable audio - no LiveKit room');
+                return;
+            }
+
+            // If already have local audio track, don't create another
+            if (localAudioTrack) {
+                console.log('Local audio track already enabled');
+                return;
+            }
 
             try {
+                console.log('Creating local audio track...');
                 localAudioTrack = await LivekitClient.createLocalAudioTrack({
                     echoCancellation: true,
-                    noiseSuppression: true
+                    noiseSuppression: true,
+                    autoGainControl: true
                 });
+
+                console.log('Publishing local audio track...');
                 await livekitRoom.localParticipant.publishTrack(localAudioTrack);
-                console.log('Microphone enabled');
+                console.log('✓ Microphone enabled and published');
             } catch (err) {
-                console.error('Error enabling microphone:', err);
+                console.error('✗ Error enabling microphone:', err);
                 showToast('MICROPHONE_ERROR: Check permissions');
+                localAudioTrack = null;
             }
         }
 
         // Disable local audio
         async function disableLocalAudio() {
             if (localAudioTrack) {
-                await livekitRoom?.localParticipant.unpublishTrack(localAudioTrack);
-                localAudioTrack.stop();
-                localAudioTrack = null;
+                try {
+                    console.log('Disabling local audio...');
+                    if (livekitRoom?.localParticipant) {
+                        await livekitRoom.localParticipant.unpublishTrack(localAudioTrack);
+                    }
+                    localAudioTrack.stop();
+                    localAudioTrack = null;
+                    console.log('✓ Microphone disabled');
+                } catch (err) {
+                    console.error('Error disabling microphone:', err);
+                    localAudioTrack = null;
+                }
             }
         }
 
         // Handle incoming audio tracks
-        function handleTrackSubscribed(track, publication, participant) {
+        async function handleTrackSubscribed(track, publication, participant) {
             if (track.kind === 'audio') {
+                console.log('Subscribing to audio track from:', participant.identity);
+
+                // Remove existing audio element for this participant (prevents duplicates)
+                const existingElement = document.getElementById(`audio-${participant.identity}`);
+                if (existingElement) {
+                    console.log('Removing existing audio element for:', participant.identity);
+                    existingElement.remove();
+                }
+
                 const audioElement = track.attach();
                 audioElement.id = `audio-${participant.identity}`;
+                audioElement.autoplay = true;
+                audioElement.playsInline = true;
+                audioElement.volume = 1.0; // Full volume
                 document.body.appendChild(audioElement);
-                console.log('Audio track subscribed:', participant.identity);
+
+                // Explicitly play the audio element to ensure it works
+                try {
+                    await audioElement.play();
+                    console.log('✓ Audio track playing:', participant.identity);
+                } catch (err) {
+                    console.warn('Audio autoplay blocked for:', participant.identity, err);
+                    // Try again after a small delay
+                    setTimeout(async () => {
+                        try {
+                            await audioElement.play();
+                            console.log('✓ Audio playback retry successful:', participant.identity);
+                        } catch (retryErr) {
+                            console.error('✗ Audio playback failed:', participant.identity, retryErr);
+                            showToast('Audio playback issue - check browser permissions');
+                        }
+                    }, 100);
+                }
             }
         }
 
@@ -3716,16 +3941,32 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
 
         // Cleanup LiveKit connection
         function cleanupLiveKit() {
+            console.log('Cleaning up LiveKit connection...');
+
             if (localAudioTrack) {
-                localAudioTrack.stop();
+                try {
+                    localAudioTrack.stop();
+                    console.log('✓ Local audio track stopped');
+                } catch (err) {
+                    console.error('Error stopping local audio track:', err);
+                }
                 localAudioTrack = null;
             }
+
             if (livekitRoom) {
-                livekitRoom.disconnect();
+                try {
+                    livekitRoom.disconnect();
+                    console.log('✓ LiveKit room disconnected');
+                } catch (err) {
+                    console.error('Error disconnecting from room:', err);
+                }
                 livekitRoom = null;
             }
+
             // Remove all audio elements
-            document.querySelectorAll('[id^="audio-"]').forEach(el => el.remove());
+            const audioElements = document.querySelectorAll('[id^="audio-"]');
+            console.log(`Removing ${audioElements.length} audio elements`);
+            audioElements.forEach(el => el.remove());
         }
 
         // Refresh token when role changes (approved to speak)
@@ -3749,6 +3990,17 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
 
                         // Reconnect with new token that has publish permissions
                         await livekitRoom.connect(tokenData.url || livekitUrl, tokenData.token);
+                        console.log('Reconnected to LiveKit room');
+
+                        // Re-subscribe to existing participants' audio tracks
+                        livekitRoom.remoteParticipants.forEach(participant => {
+                            console.log('Re-subscribing to existing participant:', participant.identity);
+                            participant.audioTrackPublications.forEach(publication => {
+                                if (publication.isSubscribed && publication.audioTrack) {
+                                    handleTrackSubscribed(publication.audioTrack, publication, participant);
+                                }
+                            });
+                        });
 
                         // Now enable local audio
                         await enableLocalAudio();
@@ -4084,17 +4336,24 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                     body: JSON.stringify({ userId: currentUser.id })
                 });
 
+                console.log('Mute toggle result:', result.is_muted);
+
                 // Also mute/unmute actual LiveKit audio
-                if (localAudioTrack && livekitRoom) {
+                if (livekitRoom && livekitRoom.localParticipant) {
                     if (result.is_muted) {
                         await livekitRoom.localParticipant.setMicrophoneEnabled(false);
+                        console.log('Microphone muted');
                     } else {
                         await livekitRoom.localParticipant.setMicrophoneEnabled(true);
+                        console.log('Microphone unmuted');
                     }
+                } else {
+                    console.warn('Cannot toggle mute - no active LiveKit connection');
                 }
 
                 await loadNetRoom();
             } catch (err) {
+                console.error('Error toggling mute:', err);
                 showToast('Error toggling mute');
             }
         }
