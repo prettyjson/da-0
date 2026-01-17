@@ -32,6 +32,24 @@ function initDatabase() {
             db.exec('ALTER TABLE messages ADD COLUMN attachment_type TEXT DEFAULT NULL');
             console.log('Added attachment_type column to messages table');
         }
+
+        // Create message_reactions table if it doesn't exist
+        const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_reactions'").all();
+        if (tables.length === 0) {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS message_reactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    message_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    emoji TEXT NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(id),
+                    UNIQUE(message_id, user_id, emoji)
+                )
+            `);
+            console.log('Created message_reactions table');
+        }
     } catch (err) {
         console.error('Migration error:', err);
     }
