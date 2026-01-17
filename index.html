@@ -707,6 +707,96 @@
             font-size: 10px;
         }
 
+        .message-reactions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+        }
+
+        .reaction-item {
+            background: rgba(0, 255, 65, 0.05);
+            border: 1px solid #004d15;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 10px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            transition: all 0.2s;
+        }
+
+        .reaction-item:hover {
+            background: rgba(0, 255, 65, 0.15);
+            border-color: #00ff41;
+        }
+
+        .reaction-item.user-reacted {
+            background: rgba(0, 255, 65, 0.15);
+            border-color: #00ff41;
+        }
+
+        .reaction-add-btn {
+            background: transparent;
+            border: 1px solid #004d15;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 10px;
+            cursor: pointer;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .reaction-add-btn:hover {
+            border-color: #00ff41;
+            color: #00ff41;
+        }
+
+        .reaction-picker {
+            display: none;
+            position: absolute;
+            background: #0a0a0a;
+            border: 1px solid #00ff41;
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 4px 12px rgba(0, 255, 65, 0.3);
+            z-index: 10000;
+            flex-wrap: wrap;
+            gap: 6px;
+            max-width: 200px;
+        }
+
+        .reaction-picker.show {
+            display: flex;
+        }
+
+        .reaction-picker-emoji {
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            transition: all 0.15s;
+        }
+
+        .reaction-picker-emoji:hover {
+            background: rgba(0, 255, 65, 0.15);
+            transform: scale(1.2);
+        }
+
+        .reaction-tooltip {
+            position: absolute;
+            background: #0a0a0a;
+            border: 1px solid #00ff41;
+            padding: 6px 10px;
+            font-size: 9px;
+            border-radius: 4px;
+            z-index: 10001;
+            white-space: nowrap;
+            pointer-events: none;
+            box-shadow: 0 2px 8px rgba(0, 255, 65, 0.3);
+        }
+
         .chat-input {
             padding: 10px;
             border-top: 1px solid #00ff41;
@@ -3098,6 +3188,10 @@ AUG  $24.9M  ██████████████████████�
 
     <!-- Message Context Menu -->
     <div id="message-context-menu" style="display: none; position: fixed; z-index: 10000; background: #0a0a0a; border: 1px solid #00ff41; box-shadow: 0 4px 12px rgba(0, 255, 65, 0.3); min-width: 150px;">
+        <div onclick="contextMenuReact()" style="padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #004d15; display: flex; align-items: center; gap: 10px;" onmouseover="this.style.background='rgba(0, 255, 65, 0.1)'" onmouseout="this.style.background='transparent'">
+            <span style="font-size: 14px;">😀</span>
+            <span style="color: #00ff41;">React</span>
+        </div>
         <div onclick="contextMenuReply()" style="padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #004d15; display: flex; align-items: center; gap: 10px;" onmouseover="this.style.background='rgba(0, 255, 65, 0.1)'" onmouseout="this.style.background='transparent'">
             <span style="font-size: 14px;">↩</span>
             <span style="color: #00ff41;">Reply</span>
@@ -3106,6 +3200,18 @@ AUG  $24.9M  ██████████████████████�
             <span style="font-size: 14px;">📋</span>
             <span style="color: #00ff41;">Copy Text</span>
         </div>
+    </div>
+
+    <!-- Reaction Picker -->
+    <div id="reaction-picker" class="reaction-picker">
+        <div class="reaction-picker-emoji" onclick="addReaction('👍')">👍</div>
+        <div class="reaction-picker-emoji" onclick="addReaction('👎')">👎</div>
+        <div class="reaction-picker-emoji" onclick="addReaction('😊')">😊</div>
+        <div class="reaction-picker-emoji" onclick="addReaction('😅')">😅</div>
+        <div class="reaction-picker-emoji" onclick="addReaction('😂')">😂</div>
+        <div class="reaction-picker-emoji" onclick="addReaction('🔫')">🔫</div>
+        <div class="reaction-picker-emoji" onclick="addReaction('💥')">💥</div>
+        <div class="reaction-picker-emoji" onclick="addReaction('🔥')">🔥</div>
     </div>
 
     <!-- Terminal Modal -->
@@ -3646,7 +3752,13 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 ${replyHTML}
                 <div>${msg.content || ''}</div>
                 ${imageHTML}
+                <div class="message-reactions" id="reactions-${msg.id}"></div>
             `;
+
+            // Render reactions if any
+            if (msg.reactions) {
+                renderReactions(msg.id, msg.reactions);
+            }
 
             // Add right-click handler
             messageDiv.addEventListener('contextmenu', function(e) {
@@ -3782,6 +3894,123 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             }
         }
 
+        // ============ MESSAGE REACTIONS ============
+        let currentReactionMessageId = null;
+
+        function renderReactions(messageId, reactions) {
+            const container = document.getElementById(`reactions-${messageId}`);
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            // Render each reaction type
+            Object.keys(reactions).forEach(emoji => {
+                const reactionData = reactions[emoji];
+                const userReacted = currentUser && reactionData.users.some(u => u.id === currentUser.id);
+
+                const reactionEl = document.createElement('div');
+                reactionEl.className = 'reaction-item' + (userReacted ? ' user-reacted' : '');
+                reactionEl.innerHTML = `${emoji} <span style="color: #666;">${reactionData.count}</span>`;
+                reactionEl.dataset.emoji = emoji;
+                reactionEl.dataset.messageId = messageId;
+
+                // Click to toggle reaction
+                reactionEl.addEventListener('click', function() {
+                    toggleReaction(messageId, emoji);
+                });
+
+                // Hover to show who reacted
+                reactionEl.addEventListener('mouseenter', function(e) {
+                    showReactionTooltip(e, reactionData.users);
+                });
+
+                reactionEl.addEventListener('mouseleave', function() {
+                    hideReactionTooltip();
+                });
+
+                container.appendChild(reactionEl);
+            });
+
+            // Add "+" button to add new reactions
+            const addBtn = document.createElement('div');
+            addBtn.className = 'reaction-add-btn';
+            addBtn.textContent = '+';
+            addBtn.addEventListener('click', function(e) {
+                showReactionPicker(e, messageId);
+            });
+            container.appendChild(addBtn);
+        }
+
+        async function toggleReaction(messageId, emoji) {
+            if (!currentUser) return;
+
+            try {
+                const response = await api(`/api/messages/${messageId}/reactions`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id, emoji })
+                });
+
+                // Update will come via WebSocket, but update locally for immediate feedback
+                renderReactions(messageId, response.reactions);
+            } catch (err) {
+                console.error('Failed to toggle reaction:', err);
+            }
+        }
+
+        async function addReaction(emoji) {
+            if (!currentReactionMessageId) return;
+
+            closeReactionPicker();
+            await toggleReaction(currentReactionMessageId, emoji);
+        }
+
+        function showReactionPicker(event, messageId) {
+            const picker = document.getElementById('reaction-picker');
+            currentReactionMessageId = messageId;
+
+            // Position picker near the click
+            picker.style.left = event.pageX + 'px';
+            picker.style.top = (event.pageY - 60) + 'px';
+            picker.classList.add('show');
+
+            // Close picker when clicking outside
+            setTimeout(() => {
+                document.addEventListener('click', closeReactionPicker, { once: true });
+            }, 10);
+
+            event.stopPropagation();
+        }
+
+        function closeReactionPicker() {
+            const picker = document.getElementById('reaction-picker');
+            picker.classList.remove('show');
+            currentReactionMessageId = null;
+        }
+
+        let reactionTooltip = null;
+
+        function showReactionTooltip(event, users) {
+            hideReactionTooltip();
+
+            reactionTooltip = document.createElement('div');
+            reactionTooltip.className = 'reaction-tooltip';
+            reactionTooltip.textContent = users.map(u => u.username).join(', ');
+
+            document.body.appendChild(reactionTooltip);
+
+            // Position tooltip
+            const rect = event.target.getBoundingClientRect();
+            reactionTooltip.style.left = rect.left + 'px';
+            reactionTooltip.style.top = (rect.top - reactionTooltip.offsetHeight - 5) + 'px';
+        }
+
+        function hideReactionTooltip() {
+            if (reactionTooltip) {
+                reactionTooltip.remove();
+                reactionTooltip = null;
+            }
+        }
+
         // ============ MESSAGE CONTEXT MENU ============
         function showContextMenu(event, messageId, username, content) {
             const menu = document.getElementById('message-context-menu');
@@ -3802,6 +4031,18 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
 
         function closeContextMenu() {
             document.getElementById('message-context-menu').style.display = 'none';
+        }
+
+        function contextMenuReact() {
+            if (contextMenuData.messageId) {
+                // Show reaction picker
+                const messageEl = document.querySelector(`[data-message-id="${contextMenuData.messageId}"]`);
+                if (messageEl) {
+                    const rect = messageEl.getBoundingClientRect();
+                    showReactionPicker({ pageX: rect.left + 50, pageY: rect.bottom - 30 }, contextMenuData.messageId);
+                }
+            }
+            closeContextMenu();
         }
 
         function contextMenuReply() {
@@ -4307,6 +4548,13 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                         const chatMessages = document.getElementById('chat-messages');
                         appendMessage(data.message, chatMessages);
                         chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                    return;
+
+                case 'message:reactions':
+                    // Reaction update for a message
+                    if (currentChannelId && String(data.channelId) === String(currentChannelId)) {
+                        renderReactions(data.messageId, data.reactions);
                     }
                     return;
             }
