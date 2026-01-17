@@ -104,6 +104,18 @@ CREATE TABLE IF NOT EXISTS messages (
     FOREIGN KEY (reply_to_id) REFERENCES messages(id)
 );
 
+-- Message reactions
+CREATE TABLE IF NOT EXISTS message_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    emoji TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(message_id, user_id, emoji)
+);
+
 -- Voice stages
 CREATE TABLE IF NOT EXISTS stages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

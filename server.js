@@ -21,7 +21,7 @@ initDatabase();
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increased limit for base64 image uploads
 app.use(express.static(path.join(__dirname)));
 
 // Helper to get DB connection
@@ -352,6 +352,29 @@ app.get('/api/channels/:id/messages', (req, res) => {
         `).all(req.params.id, parseInt(limit));
     }
 
+    // Add reactions to each message
+    messages.forEach(msg => {
+        const reactions = db().prepare(`
+            SELECT mr.emoji, mr.user_id, u.username
+            FROM message_reactions mr
+            JOIN users u ON mr.user_id = u.id
+            WHERE mr.message_id = ?
+            ORDER BY mr.created_at
+        `).all(msg.id);
+
+        // Group by emoji
+        const grouped = {};
+        reactions.forEach(r => {
+            if (!grouped[r.emoji]) {
+                grouped[r.emoji] = { count: 0, users: [] };
+            }
+            grouped[r.emoji].count++;
+            grouped[r.emoji].users.push({ id: r.user_id, username: r.username });
+        });
+
+        msg.reactions = grouped;
+    });
+
     res.json(messages);
 });
 
@@ -375,6 +398,88 @@ app.post('/api/channels/:id/messages', (req, res) => {
     broadcastToAll('channel:message', { channelId, message });
 
     res.json(message);
+});
+
+// Toggle reaction on a message
+app.post('/api/messages/:id/reactions', (req, res) => {
+    const { userId, emoji } = req.body;
+    const messageId = req.params.id;
+
+    // Check if reaction already exists
+    const existing = db().prepare(`
+        SELECT * FROM message_reactions
+        WHERE message_id = ? AND user_id = ? AND emoji = ?
+    `).get(messageId, userId, emoji);
+
+    if (existing) {
+        // Remove reaction
+        db().prepare(`
+            DELETE FROM message_reactions
+            WHERE message_id = ? AND user_id = ? AND emoji = ?
+        `).run(messageId, userId, emoji);
+    } else {
+        // Add reaction
+        db().prepare(`
+            INSERT INTO message_reactions (message_id, user_id, emoji, created_at)
+            VALUES (?, ?, ?, ?)
+        `).run(messageId, userId, emoji, new Date().toISOString());
+    }
+
+    // Get all reactions for this message with user details
+    const reactions = db().prepare(`
+        SELECT mr.emoji, mr.user_id, u.username
+        FROM message_reactions mr
+        JOIN users u ON mr.user_id = u.id
+        WHERE mr.message_id = ?
+        ORDER BY mr.created_at
+    `).all(messageId);
+
+    // Group by emoji
+    const grouped = {};
+    reactions.forEach(r => {
+        if (!grouped[r.emoji]) {
+            grouped[r.emoji] = { count: 0, users: [] };
+        }
+        grouped[r.emoji].count++;
+        grouped[r.emoji].users.push({ id: r.user_id, username: r.username });
+    });
+
+    // Get channel ID for broadcasting
+    const message = db().prepare('SELECT channel_id FROM messages WHERE id = ?').get(messageId);
+
+    // Broadcast reaction update to all clients
+    broadcastToAll('message:reactions', {
+        messageId: parseInt(messageId),
+        channelId: message.channel_id,
+        reactions: grouped
+    });
+
+    res.json({ reactions: grouped });
+});
+
+// Get reactions for a message
+app.get('/api/messages/:id/reactions', (req, res) => {
+    const messageId = req.params.id;
+
+    const reactions = db().prepare(`
+        SELECT mr.emoji, mr.user_id, u.username
+        FROM message_reactions mr
+        JOIN users u ON mr.user_id = u.id
+        WHERE mr.message_id = ?
+        ORDER BY mr.created_at
+    `).all(messageId);
+
+    // Group by emoji
+    const grouped = {};
+    reactions.forEach(r => {
+        if (!grouped[r.emoji]) {
+            grouped[r.emoji] = { count: 0, users: [] };
+        }
+        grouped[r.emoji].count++;
+        grouped[r.emoji].users.push({ id: r.user_id, username: r.username });
+    });
+
+    res.json({ reactions: grouped });
 });
 
 // Create a new channel
