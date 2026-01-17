@@ -3105,6 +3105,20 @@ AUG  $24.9M  ██████████████████████�
         </div>
     </div>
 
+    <!-- Terminal Modal -->
+    <div id="terminal-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.9); z-index: 20000; align-items: center; justify-content: center;">
+        <div style="background: #0a0a0a; border: 2px solid #00ff41; box-shadow: 0 0 30px rgba(0, 255, 65, 0.5); padding: 20px; min-width: 400px; max-width: 500px; font-family: 'JetBrains Mono', monospace;">
+            <div style="border-bottom: 1px solid #00ff41; padding-bottom: 10px; margin-bottom: 15px; color: #00ff41; font-weight: bold; font-size: 14px;">
+                SYSTEM_MESSAGE
+            </div>
+            <div id="terminal-modal-message" style="color: #00ff41; font-size: 12px; margin-bottom: 20px; line-height: 1.5;">
+            </div>
+            <div id="terminal-modal-buttons" style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button onclick="closeTerminalModal()" style="padding: 8px 20px; background: rgba(0, 255, 65, 0.1); border: 1px solid #00ff41; color: #00ff41; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px;">OK</button>
+            </div>
+        </div>
+    </div>
+
     <div class="system-info">
         SYSTEM_STATUS: OPERATIONAL | PING: 23ms | LAST_SYNC: 11AUG25_0847Z
     </div>
@@ -3183,10 +3197,10 @@ AUG  $24.9M  ██████████████████████�
                     }
                 } catch (err) {
                     console.error('Login error:', err);
-                    alert('Login failed');
+                    // Don't show error for spoofed login - just log it
                 }
             } else {
-                alert('Please enter username and password');
+                showTerminalAlert('ERROR: Please enter username and password');
             }
         }
 
@@ -3232,12 +3246,12 @@ AUG  $24.9M  ██████████████████████�
                 document.getElementById('verification-screen').classList.remove('hidden');
                 document.getElementById('current-user').textContent = username.toUpperCase();
             } else {
-                alert('Please fill in all fields');
+                showTerminalAlert('ERROR: Please fill in all fields');
             }
         }
 
         async function logout() {
-            if (confirm('Are you sure you want to logout?')) {
+            if (await showTerminalConfirm('Are you sure you want to logout?')) {
                 if (currentUser) {
                     await api('/api/auth/logout', {
                         method: 'POST',
@@ -3925,6 +3939,46 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             document.body.appendChild(toast);
 
             setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Terminal-style modals
+        let terminalModalResolve = null;
+
+        function showTerminalAlert(message) {
+            const modal = document.getElementById('terminal-modal');
+            const messageDiv = document.getElementById('terminal-modal-message');
+            const buttonsDiv = document.getElementById('terminal-modal-buttons');
+
+            messageDiv.textContent = message;
+            buttonsDiv.innerHTML = '<button onclick="closeTerminalModal()" style="padding: 8px 20px; background: rgba(0, 255, 65, 0.1); border: 1px solid #00ff41; color: #00ff41; cursor: pointer; font-family: \'JetBrains Mono\', monospace; font-size: 11px;">OK</button>';
+            modal.style.display = 'flex';
+        }
+
+        function showTerminalConfirm(message) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('terminal-modal');
+                const messageDiv = document.getElementById('terminal-modal-message');
+                const buttonsDiv = document.getElementById('terminal-modal-buttons');
+
+                terminalModalResolve = resolve;
+
+                messageDiv.textContent = message;
+                buttonsDiv.innerHTML = `
+                    <button onclick="closeTerminalModal(false)" style="padding: 8px 20px; background: rgba(255, 0, 0, 0.1); border: 1px solid #ff0000; color: #ff0000; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px;">CANCEL</button>
+                    <button onclick="closeTerminalModal(true)" style="padding: 8px 20px; background: rgba(0, 255, 65, 0.1); border: 1px solid #00ff41; color: #00ff41; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px;">CONFIRM</button>
+                `;
+                modal.style.display = 'flex';
+            });
+        }
+
+        function closeTerminalModal(result) {
+            const modal = document.getElementById('terminal-modal');
+            modal.style.display = 'none';
+
+            if (terminalModalResolve) {
+                terminalModalResolve(result === true);
+                terminalModalResolve = null;
+            }
         }
 
         // Load referral data for current user
@@ -4978,7 +5032,8 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
         async function endNet() {
             if (!currentNetId || !currentUser) return;
 
-            if (!confirm('Are you sure you want to end this net? All participants will be disconnected.')) return;
+            const confirmed = await showTerminalConfirm('Are you sure you want to end this net? All participants will be disconnected.');
+            if (!confirmed) return;
 
             try {
                 await api(`/api/nets/${currentNetId}/end`, {
