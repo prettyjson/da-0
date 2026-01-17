@@ -15,7 +15,9 @@ CREATE TABLE IF NOT EXISTS users (
     join_date TEXT,
     is_online INTEGER DEFAULT 0,
     last_dividend REAL DEFAULT 0,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    referred_by INTEGER,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (referred_by) REFERENCES users(id)
 );
 
 -- User badges (awards/decorations)
@@ -115,4 +117,71 @@ CREATE TABLE IF NOT EXISTS network_stats (
     active_nodes INTEGER DEFAULT 0,
     uptime_percentage REAL DEFAULT 99.97,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Invites (referral system)
+CREATE TABLE IF NOT EXISTS invites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    created_by INTEGER NOT NULL,
+    used_by INTEGER,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    used_at TEXT,
+    expires_at TEXT,
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (used_by) REFERENCES users(id)
+);
+
+-- Nets (audio rooms - like Twitter Spaces/Clubhouse)
+CREATE TABLE IF NOT EXISTS nets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    host_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'live',  -- live, ended, scheduled
+    is_recording INTEGER DEFAULT 0,
+    started_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    ended_at TEXT,
+    scheduled_for TEXT,
+    max_speakers INTEGER DEFAULT 10,
+    FOREIGN KEY (host_id) REFERENCES users(id)
+);
+
+-- Net participants (who is in a net and their role)
+CREATE TABLE IF NOT EXISTS net_participants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    net_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    role TEXT DEFAULT 'listener',  -- host, co-host, speaker, listener
+    is_muted INTEGER DEFAULT 1,
+    joined_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    left_at TEXT,
+    FOREIGN KEY (net_id) REFERENCES nets(id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(net_id, user_id)
+);
+
+-- Speak requests (listeners requesting to speak)
+CREATE TABLE IF NOT EXISTS speak_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    net_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'pending',  -- pending, approved, denied
+    requested_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TEXT,
+    resolved_by INTEGER,
+    FOREIGN KEY (net_id) REFERENCES nets(id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (resolved_by) REFERENCES users(id)
+);
+
+-- Net messages (live chat for nets)
+CREATE TABLE IF NOT EXISTS net_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    net_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (net_id) REFERENCES nets(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
