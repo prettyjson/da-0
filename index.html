@@ -672,6 +672,8 @@
             display: flex;
             flex-direction: column;
             background: rgba(0, 255, 65, 0.02);
+            min-height: 400px;
+            max-height: 600px;
         }
 
         .chat-header {
@@ -679,6 +681,7 @@
             border-bottom: 1px solid #00ff41;
             font-weight: bold;
             background: rgba(0, 255, 65, 0.05);
+            flex-shrink: 0;
         }
 
         .chat-messages {
@@ -686,6 +689,7 @@
             padding: 10px;
             overflow-y: auto;
             font-size: 11px;
+            min-height: 0;
         }
 
         .message {
@@ -707,7 +711,9 @@
             padding: 10px;
             border-top: 1px solid #00ff41;
             display: flex;
-            gap: 10px;
+            flex-direction: column;
+            gap: 0;
+            flex-shrink: 0;
         }
 
         .chat-input input {
@@ -2787,8 +2793,21 @@ AUG  $24.9M  ██████████████████████�
                     </div>
                     
                     <div class="chat-input">
-                        <input type="text" placeholder="Type message..." id="message-input" />
-                        <button onclick="sendMessage()">SEND</button>
+                        <div id="reply-indicator" style="display: none; padding: 5px 10px; background: rgba(0, 255, 65, 0.05); border-left: 2px solid #00ff41; margin-bottom: 5px; font-size: 10px;">
+                            <div style="color: #888;">Replying to <span id="reply-to-user"></span></div>
+                            <div style="color: #666; margin-top: 2px;" id="reply-to-preview"></div>
+                            <button onclick="cancelReply()" style="position: absolute; right: 10px; top: 5px; background: none; border: none; color: #888; cursor: pointer;">×</button>
+                        </div>
+                        <div id="image-preview" style="display: none; padding: 5px 10px; background: rgba(0, 255, 65, 0.05); margin-bottom: 5px;">
+                            <img id="preview-img" style="max-width: 100px; max-height: 100px; border: 1px solid #00ff41;" />
+                            <button onclick="cancelImage()" style="margin-left: 10px; font-size: 10px; padding: 2px 6px; background: rgba(255, 0, 0, 0.2); border: 1px solid #ff0000; color: #ff0000; cursor: pointer;">REMOVE</button>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <input type="file" id="image-upload-input" accept="image/jpeg,image/jpg,image/png" style="display: none;" onchange="handleImageSelect(event)" />
+                            <button onclick="document.getElementById('image-upload-input').click()" style="padding: 8px 12px; font-size: 10px; background: rgba(0, 255, 65, 0.1); border: 1px solid #00ff41; color: #00ff41; cursor: pointer;" title="Upload image">📷</button>
+                            <input type="text" placeholder="Type message..." id="message-input" style="flex: 1;" />
+                            <button onclick="sendMessage()">SEND</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3019,6 +3038,70 @@ AUG  $24.9M  ██████████████████████�
             <button class="mini-player-mute muted" id="mini-player-mute" onclick="toggleMute()">
                 🎤 UNMUTE
             </button>
+        </div>
+    </div>
+
+    <!-- Create Channel Modal -->
+    <div class="create-net-modal" id="create-channel-modal" onclick="closeCreateChannelModal(event)">
+        <div class="create-net-content" onclick="event.stopPropagation()">
+            <div style="font-size: 16px; font-weight: bold; margin-bottom: 20px; color: #00ff41;">CREATE_NEW_CHANNEL</div>
+
+            <div class="form-group">
+                <label class="form-label">CHANNEL_NAME:</label>
+                <input type="text" class="form-input" id="new-channel-name" placeholder="e.g., DEPLOYMENT_PHOTOS" />
+            </div>
+
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="channel-is-private" />
+                    <span style="color: #888;">Make this channel private</span>
+                </label>
+            </div>
+
+            <div style="margin: 20px 0; padding: 15px; border: 1px solid #004d15; font-size: 10px; color: #888;">
+                <div style="color: #ffaa00; margin-bottom: 8px;">CHANNEL_INFO:</div>
+                • Public channels: Visible to all members<br/>
+                • Private channels: Invite-only access
+            </div>
+
+            <button class="btn-primary" onclick="createChannel()">CREATE_CHANNEL</button>
+            <button class="btn-secondary" onclick="closeCreateChannelModal()">CANCEL</button>
+        </div>
+    </div>
+
+    <!-- New DM Modal -->
+    <div class="create-net-modal" id="new-dm-modal" onclick="closeNewDMModal(event)">
+        <div class="create-net-content" onclick="event.stopPropagation()">
+            <div style="font-size: 16px; font-weight: bold; margin-bottom: 20px; color: #00ff41;">START_DIRECT_MESSAGE</div>
+
+            <div class="form-group">
+                <label class="form-label">SEARCH_USER:</label>
+                <input type="text" class="form-input" id="dm-user-search" placeholder="Type username..." oninput="searchUsers()" autocomplete="off" />
+            </div>
+
+            <div id="user-search-results" style="max-height: 200px; overflow-y: auto; margin-bottom: 20px; border: 1px solid #004d15; display: none;">
+                <!-- Search results will appear here -->
+            </div>
+
+            <div style="margin: 20px 0; padding: 15px; border: 1px solid #004d15; font-size: 10px; color: #888;">
+                <div style="color: #ffaa00; margin-bottom: 8px;">DM_INFO:</div>
+                • Type at least 2 characters to search<br/>
+                • Click on a user to start messaging
+            </div>
+
+            <button class="btn-secondary" onclick="closeNewDMModal()">CANCEL</button>
+        </div>
+    </div>
+
+    <!-- Message Context Menu -->
+    <div id="message-context-menu" style="display: none; position: fixed; z-index: 10000; background: #0a0a0a; border: 1px solid #00ff41; box-shadow: 0 4px 12px rgba(0, 255, 65, 0.3); min-width: 150px;">
+        <div onclick="contextMenuReply()" style="padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #004d15; display: flex; align-items: center; gap: 10px;" onmouseover="this.style.background='rgba(0, 255, 65, 0.1)'" onmouseout="this.style.background='transparent'">
+            <span style="font-size: 14px;">↩</span>
+            <span style="color: #00ff41;">Reply</span>
+        </div>
+        <div onclick="contextMenuCopyText()" style="padding: 10px 15px; cursor: pointer; display: flex; align-items: center; gap: 10px;" onmouseover="this.style.background='rgba(0, 255, 65, 0.1)'" onmouseout="this.style.background='transparent'">
+            <span style="font-size: 14px;">📋</span>
+            <span style="color: #00ff41;">Copy Text</span>
         </div>
     </div>
 
@@ -3469,9 +3552,17 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             rooms.forEach(room => room.classList.remove('active'));
             event.target.closest('.chat-room').classList.add('active');
 
+            // Clear reply and image state when switching channels
+            cancelReply();
+            cancelImage();
+
             currentChannelId = channelId;
             await loadMessages(channelId, channelName, isDM);
         }
+
+        let replyToMessageId = null;
+        let replyToUsername = null;
+        let selectedImageData = null;
 
         async function loadMessages(channelId, channelName, isDM = false) {
             currentChannelId = channelId;
@@ -3484,51 +3575,304 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             chatMessages.innerHTML = '';
 
             messages.forEach(msg => {
-                const timestamp = new Date(msg.timestamp);
-                const timeStr = `[${String(timestamp.getUTCHours()).padStart(2, '0')}${String(timestamp.getUTCMinutes()).padStart(2, '0')}Z]`;
-
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message';
-                messageDiv.innerHTML = `
-                    <div class="message-header">
-                        <span>${msg.username}</span>
-                        <span class="timestamp">${timeStr}</span>
-                    </div>
-                    <div>${msg.content}</div>
-                `;
-                chatMessages.appendChild(messageDiv);
+                appendMessage(msg, chatMessages);
             });
 
             chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        let contextMenuData = { messageId: null, username: null, content: null };
+
+        function appendMessage(msg, container) {
+            const timestamp = new Date(msg.timestamp);
+            const timeStr = `[${String(timestamp.getHours()).padStart(2, '0')}${String(timestamp.getMinutes()).padStart(2, '0')}]`;
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.dataset.messageId = msg.id;
+            messageDiv.dataset.username = msg.username;
+            messageDiv.dataset.content = msg.content || '';
+            messageDiv.style.cursor = 'context-menu';
+
+            let replyHTML = '';
+            if (msg.reply_to_id) {
+                replyHTML = `
+                    <div style="padding: 4px 8px; margin-bottom: 4px; border-left: 2px solid #00ff41; background: rgba(0, 255, 65, 0.05); font-size: 9px; color: #888;">
+                        ↩ Replying to message
+                    </div>
+                `;
+            }
+
+            let imageHTML = '';
+            if (msg.attachment_url && msg.attachment_type && msg.attachment_type.startsWith('image/')) {
+                imageHTML = `
+                    <div style="margin-top: 8px;">
+                        <img src="${msg.attachment_url}" style="max-width: 300px; max-height: 300px; border: 1px solid #00ff41; cursor: pointer;" onclick="window.open('${msg.attachment_url}', '_blank')" />
+                    </div>
+                `;
+            }
+
+            messageDiv.innerHTML = `
+                <div class="message-header">
+                    <span>${msg.username}</span>
+                    <span class="timestamp">${timeStr}</span>
+                </div>
+                ${replyHTML}
+                <div>${msg.content || ''}</div>
+                ${imageHTML}
+            `;
+
+            // Add right-click handler
+            messageDiv.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+                showContextMenu(e, msg.id, msg.username, msg.content || '');
+            });
+
+            // Add long-press handler for mobile
+            let pressTimer;
+            messageDiv.addEventListener('touchstart', function(e) {
+                pressTimer = setTimeout(function() {
+                    const touch = e.touches[0];
+                    showContextMenu({ clientX: touch.clientX, clientY: touch.clientY }, msg.id, msg.username, msg.content || '');
+                }, 500);
+            });
+
+            messageDiv.addEventListener('touchend', function() {
+                clearTimeout(pressTimer);
+            });
+
+            messageDiv.addEventListener('touchmove', function() {
+                clearTimeout(pressTimer);
+            });
+
+            if (!container) {
+                container = document.getElementById('chat-messages');
+            }
+            container.appendChild(messageDiv);
         }
 
         async function sendMessage() {
             const input = document.getElementById('message-input');
             const message = input.value.trim();
 
-            if (message && currentChannelId && currentUser) {
-                const newMsg = await api(`/api/channels/${currentChannelId}/messages`, {
+            if ((message || selectedImageData) && currentChannelId && currentUser) {
+                const payload = {
+                    userId: currentUser.id,
+                    content: message,
+                    replyToId: replyToMessageId,
+                    attachmentUrl: selectedImageData,
+                    attachmentType: selectedImageData ? 'image/jpeg' : null
+                };
+
+                await api(`/api/channels/${currentChannelId}/messages`, {
                     method: 'POST',
-                    body: JSON.stringify({ userId: currentUser.id, content: message })
+                    body: JSON.stringify(payload)
                 });
 
-                const chatMessages = document.getElementById('chat-messages');
-                const timestamp = new Date(newMsg.timestamp);
-                const timeStr = `[${String(timestamp.getUTCHours()).padStart(2, '0')}${String(timestamp.getUTCMinutes()).padStart(2, '0')}Z]`;
-
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message';
-                messageDiv.innerHTML = `
-                    <div class="message-header">
-                        <span>${newMsg.username}</span>
-                        <span class="timestamp">${timeStr}</span>
-                    </div>
-                    <div>${newMsg.content}</div>
-                `;
-                chatMessages.appendChild(messageDiv);
-
+                // Message will be broadcast via WebSocket - no need to manually append
                 input.value = '';
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+                cancelReply();
+                cancelImage();
+            }
+        }
+
+        function setReplyTo(messageId, username, content) {
+            replyToMessageId = messageId;
+            replyToUsername = username;
+
+            document.getElementById('reply-indicator').style.display = 'block';
+            document.getElementById('reply-to-user').textContent = username;
+            document.getElementById('reply-to-preview').textContent = content.substring(0, 50) + (content.length > 50 ? '...' : '');
+            document.getElementById('message-input').focus();
+        }
+
+        function cancelReply() {
+            replyToMessageId = null;
+            replyToUsername = null;
+            document.getElementById('reply-indicator').style.display = 'none';
+        }
+
+        // ============ MESSAGE CONTEXT MENU ============
+        function showContextMenu(event, messageId, username, content) {
+            const menu = document.getElementById('message-context-menu');
+
+            // Store message data for context menu actions
+            contextMenuData = { messageId, username, content };
+
+            // Position the menu
+            menu.style.display = 'block';
+            menu.style.left = event.clientX + 'px';
+            menu.style.top = event.clientY + 'px';
+
+            // Close menu when clicking anywhere else
+            setTimeout(() => {
+                document.addEventListener('click', closeContextMenu, { once: true });
+            }, 0);
+        }
+
+        function closeContextMenu() {
+            document.getElementById('message-context-menu').style.display = 'none';
+        }
+
+        function contextMenuReply() {
+            if (contextMenuData.messageId) {
+                setReplyTo(contextMenuData.messageId, contextMenuData.username, contextMenuData.content);
+            }
+            closeContextMenu();
+        }
+
+        function contextMenuCopyText() {
+            if (contextMenuData.content) {
+                navigator.clipboard.writeText(contextMenuData.content).then(() => {
+                    showToast('Text copied');
+                }).catch(() => {
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = contextMenuData.content;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    showToast('Text copied');
+                });
+            }
+            closeContextMenu();
+        }
+
+        function handleImageSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Check file type
+            if (!file.type.startsWith('image/')) {
+                showToast('Please select an image file');
+                return;
+            }
+
+            // Check file size (5MB limit)
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('Image too large (max 5MB)');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                selectedImageData = e.target.result;
+                document.getElementById('preview-img').src = selectedImageData;
+                document.getElementById('image-preview').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function cancelImage() {
+            selectedImageData = null;
+            document.getElementById('image-preview').style.display = 'none';
+            document.getElementById('image-upload-input').value = '';
+        }
+
+        // ============ CHANNEL CREATION ============
+        function openCreateChannelModal() {
+            document.getElementById('create-channel-modal').classList.add('show');
+            document.getElementById('new-channel-name').value = '';
+            document.getElementById('channel-is-private').checked = false;
+        }
+
+        function closeCreateChannelModal(event) {
+            if (!event || event.target.id === 'create-channel-modal') {
+                document.getElementById('create-channel-modal').classList.remove('show');
+            }
+        }
+
+        async function createChannel() {
+            const name = document.getElementById('new-channel-name').value.trim();
+            const isPrivate = document.getElementById('channel-is-private').checked;
+
+            if (!name) {
+                showToast('Please enter a channel name');
+                return;
+            }
+
+            try {
+                await api('/api/channels', {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id, name, isPrivate })
+                });
+
+                showToast('Channel created!');
+                closeCreateChannelModal();
+                await loadChannels();
+            } catch (err) {
+                showToast('Error creating channel');
+            }
+        }
+
+        // ============ DM CREATION ============
+        let dmSearchTimeout = null;
+
+        function openNewDMModal() {
+            document.getElementById('new-dm-modal').classList.add('show');
+            document.getElementById('dm-user-search').value = '';
+            document.getElementById('user-search-results').style.display = 'none';
+            document.getElementById('user-search-results').innerHTML = '';
+        }
+
+        function closeNewDMModal(event) {
+            if (!event || event.target.id === 'new-dm-modal') {
+                document.getElementById('new-dm-modal').classList.remove('show');
+            }
+        }
+
+        async function searchUsers() {
+            const query = document.getElementById('dm-user-search').value.trim();
+
+            if (query.length < 2) {
+                document.getElementById('user-search-results').style.display = 'none';
+                return;
+            }
+
+            // Debounce search
+            if (dmSearchTimeout) clearTimeout(dmSearchTimeout);
+
+            dmSearchTimeout = setTimeout(async () => {
+                try {
+                    const users = await api(`/api/users/search?q=${encodeURIComponent(query)}`);
+                    const resultsDiv = document.getElementById('user-search-results');
+
+                    if (users.length === 0) {
+                        resultsDiv.innerHTML = '<div style="padding: 10px; color: #888;">No users found</div>';
+                    } else {
+                        resultsDiv.innerHTML = users.map(user => `
+                            <div onclick="createDM(${user.id}, '${user.username}')" style="padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #004d15; hover: background: rgba(0, 255, 65, 0.05);" onmouseover="this.style.background='rgba(0, 255, 65, 0.05)'" onmouseout="this.style.background='transparent'">
+                                <div style="font-weight: bold; color: #00ff41;">${user.username}</div>
+                                <div style="font-size: 9px; color: #888;">${user.rank_code} - ${user.unit || 'N/A'}</div>
+                            </div>
+                        `).join('');
+                    }
+
+                    resultsDiv.style.display = 'block';
+                } catch (err) {
+                    console.error('Search error:', err);
+                }
+            }, 300);
+        }
+
+        async function createDM(targetUserId, targetUsername) {
+            try {
+                const dm = await api('/api/dms/create', {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id, targetUserId })
+                });
+
+                closeNewDMModal();
+                await loadChannels();
+
+                // Switch to the new DM
+                const displayName = dm.name.replace('DM_', '');
+                await switchChannel(dm.id, displayName, true);
+
+                showToast(`DM with ${targetUsername} ready`);
+            } catch (err) {
+                showToast('Error creating DM');
             }
         }
 
@@ -3814,6 +4158,25 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                     if (currentNetId && String(data.netId) === String(currentNetId)) {
                         closeNetRoom();
                         showToast('NET_ENDED by host');
+                    }
+                    return;
+
+                case 'channel:created':
+                    // New channel created - refresh channel list
+                    loadChannels();
+                    return;
+
+                case 'dm:created':
+                    // New DM created - refresh channel list
+                    loadChannels();
+                    return;
+
+                case 'channel:message':
+                    // New message in a channel - only append if we're viewing that channel
+                    if (currentChannelId && String(data.channelId) === String(currentChannelId)) {
+                        const chatMessages = document.getElementById('chat-messages');
+                        appendMessage(data.message, chatMessages);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
                     }
                     return;
             }
@@ -4952,6 +5315,19 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                     }
                 });
             }
+
+            // Close context menu on scroll
+            const chatMessages = document.getElementById('chat-messages');
+            if (chatMessages) {
+                chatMessages.addEventListener('scroll', closeContextMenu);
+            }
+
+            // Close context menu on Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeContextMenu();
+                }
+            });
         });
 
         setInterval(function() {
