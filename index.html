@@ -3784,12 +3784,32 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
         function handleWebSocketMessage(message) {
             const { event, data, netId } = message;
 
-            // Only process messages for the current net
+            console.log('WebSocket event:', event, data);
+
+            // Handle global events (not specific to a net)
+            switch (event) {
+                case 'net:created':
+                    // New net was created - refresh the net lists
+                    loadNets();
+                    loadNetsInOverview();
+                    return;
+
+                case 'net:ended':
+                    // A net ended - refresh the net lists
+                    loadNets();
+                    loadNetsInOverview();
+                    // If we're in the net that ended, close it
+                    if (currentNetId && String(data.netId) === String(currentNetId)) {
+                        closeNetRoom();
+                        showToast('NET_ENDED by host');
+                    }
+                    return;
+            }
+
+            // Only process net-specific messages for the current net
             if (netId && String(netId) !== String(currentNetId)) {
                 return;
             }
-
-            console.log('WebSocket event:', event, data);
 
             switch (event) {
                 case 'net:message':

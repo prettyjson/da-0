@@ -599,6 +599,9 @@ app.post('/api/nets', (req, res) => {
         WHERE n.id = ?
     `).get(result.lastInsertRowid);
 
+    // Broadcast new net to all clients
+    broadcastToAll('net:created', net);
+
     res.json(net);
 });
 
@@ -740,6 +743,9 @@ app.post('/api/nets/:id/end', (req, res) => {
         UPDATE net_participants SET left_at = ?
         WHERE net_id = ? AND left_at IS NULL
     `).run(new Date().toISOString(), netId);
+
+    // Broadcast net ended to all clients (including participants)
+    broadcastToAll('net:ended', { netId });
 
     res.json({ success: true });
 });
