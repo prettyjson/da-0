@@ -3706,6 +3706,7 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
         let livekitEnabled = false;
         let localAudioTrack = null;
         let livekitUrl = '';
+        let isReconnecting = false; // Flag to prevent cleanup during intentional reconnection
 
         // Check if LiveKit is configured on server
         async function checkLivekitConfig() {
@@ -3919,7 +3920,10 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
         // Handle room disconnect
         function handleRoomDisconnected() {
             console.log('Disconnected from LiveKit room');
-            cleanupLiveKit();
+            // Don't cleanup if we're doing an intentional reconnection for token refresh
+            if (!isReconnecting) {
+                cleanupLiveKit();
+            }
         }
 
         // Handle active speakers (visual indicator)
@@ -3985,26 +3989,34 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                     if (livekitRoom) {
                         console.log('Reconnecting to LiveKit with speaker permissions...');
 
-                        // Disconnect current session
-                        await livekitRoom.disconnect();
+                        // Set flag to prevent cleanup during reconnection
+                        isReconnecting = true;
 
-                        // Reconnect with new token that has publish permissions
-                        await livekitRoom.connect(tokenData.url || livekitUrl, tokenData.token);
-                        console.log('Reconnected to LiveKit room');
+                        try {
+                            // Disconnect current session
+                            await livekitRoom.disconnect();
 
-                        // Re-subscribe to existing participants' audio tracks
-                        livekitRoom.remoteParticipants.forEach(participant => {
-                            console.log('Re-subscribing to existing participant:', participant.identity);
-                            participant.audioTrackPublications.forEach(publication => {
-                                if (publication.isSubscribed && publication.audioTrack) {
-                                    handleTrackSubscribed(publication.audioTrack, publication, participant);
-                                }
+                            // Reconnect with new token that has publish permissions
+                            await livekitRoom.connect(tokenData.url || livekitUrl, tokenData.token);
+                            console.log('Reconnected to LiveKit room');
+
+                            // Re-subscribe to existing participants' audio tracks
+                            livekitRoom.remoteParticipants.forEach(participant => {
+                                console.log('Re-subscribing to existing participant:', participant.identity);
+                                participant.audioTrackPublications.forEach(publication => {
+                                    if (publication.isSubscribed && publication.audioTrack) {
+                                        handleTrackSubscribed(publication.audioTrack, publication, participant);
+                                    }
+                                });
                             });
-                        });
 
-                        // Now enable local audio
-                        await enableLocalAudio();
-                        showToast('MIC_ENABLED - You can now speak!');
+                            // Now enable local audio
+                            await enableLocalAudio();
+                            showToast('MIC_ENABLED - You can now speak!');
+                        } finally {
+                            // Clear reconnection flag
+                            isReconnecting = false;
+                        }
                     }
                 }
             } catch (err) {
