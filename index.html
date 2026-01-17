@@ -945,6 +945,49 @@
             font-size: 10px;
         }
 
+        .invite-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #00ff41;
+            background: rgba(0, 255, 65, 0.02);
+        }
+
+        .invite-stats {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 10px;
+            color: #888;
+        }
+
+        .invite-code {
+            background: rgba(0, 255, 65, 0.1);
+            border: 2px solid #00ff41;
+            padding: 15px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ff41;
+            cursor: pointer;
+            user-select: all;
+            transition: all 0.2s;
+        }
+
+        .invite-code:hover {
+            background: rgba(0, 255, 65, 0.15);
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+        }
+
+        .referral-badge {
+            background: rgba(0, 255, 65, 0.05);
+            border: 1px solid #004d15;
+            padding: 5px 10px;
+            margin: 3px;
+            display: inline-block;
+            font-size: 10px;
+            color: #00ff41;
+        }
+
         .system-info {
             position: fixed;
             bottom: 10px;
@@ -3022,7 +3065,17 @@ AUG  $24.9M  ██████████████████████�
                     <!-- Your referral stats -->
                     <div class="invite-stats">
                         <span>INVITES_THIS_WEEK: <span id="invites-remaining">5</span>/5</span>
-                        <span>TOTAL_RECRUITS: <span id="total-referrals">0</span></span>
+                        <span style="cursor: pointer; text-decoration: underline;" onclick="showRecruitsModal()">
+                            TOTAL_RECRUITS: <span id="total-referrals">0</span>
+                        </span>
+                    </div>
+
+                    <!-- Viral incentive messaging -->
+                    <div style="background: rgba(0, 255, 65, 0.05); border: 1px solid #004d15; padding: 10px; margin: 10px 0; font-size: 9px; color: #888;">
+                        <div style="color: #00ff41; font-weight: bold; margin-bottom: 5px;">🎖️ RECRUIT REWARDS</div>
+                        • Each recruit increases your network stake<br/>
+                        • Top recruiters gain special access<br/>
+                        • Build your network, grow your influence
                     </div>
 
                     <!-- Generate invite button -->
@@ -3235,6 +3288,29 @@ AUG  $24.9M  ██████████████████████�
 
     <!-- Reaction Picker -->
     <div id="reaction-picker" class="reaction-picker"></div>
+
+    <!-- Recruits Modal -->
+    <div id="recruits-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.9); z-index: 20000; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace;">
+        <div style="background: #0a0a0a; border: 2px solid #00ff41; box-shadow: 0 0 30px rgba(0, 255, 65, 0.5); padding: 20px; min-width: 400px; max-width: 500px; max-height: 80vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #00ff41; padding-bottom: 10px; margin-bottom: 15px;">
+                <div style="color: #00ff41; font-weight: bold; font-size: 14px;">YOUR_RECRUIT_NETWORK</div>
+                <button onclick="closeRecruitsModal()" style="background: none; border: none; color: #00ff41; font-size: 24px; cursor: pointer; padding: 0; line-height: 1;">×</button>
+            </div>
+
+            <div style="margin-bottom: 15px; font-size: 11px; color: #888;">
+                <div>TOTAL_RECRUITS: <span id="modal-total-recruits" style="color: #00ff41;">0</span></div>
+                <div>NETWORK_INFLUENCE: <span id="modal-influence" style="color: #ffaa00;">BUILDING</span></div>
+            </div>
+
+            <div id="recruits-modal-list" style="color: #00ff41; font-size: 11px;">
+                <!-- Recruits will be loaded here -->
+            </div>
+
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #004d15; font-size: 9px; color: #666; text-align: center;">
+                Keep growing your network to increase your stake and influence
+            </div>
+        </div>
+    </div>
 
     <!-- Terminal Modal -->
     <div id="terminal-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.9); z-index: 20000; align-items: center; justify-content: center;">
@@ -4512,6 +4588,62 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                     copyInviteCode();
                 }
             }
+        }
+
+        // Show recruits modal
+        async function showRecruitsModal() {
+            if (!currentUser) return;
+
+            try {
+                const referralsData = await api(`/api/users/${currentUser.id}/referrals`);
+                const modal = document.getElementById('recruits-modal');
+                const list = document.getElementById('recruits-modal-list');
+
+                document.getElementById('modal-total-recruits').textContent = referralsData.count;
+
+                if (referralsData.count === 0) {
+                    list.innerHTML = `
+                        <div style="text-align: center; padding: 20px; color: #666;">
+                            <div style="font-size: 32px; margin-bottom: 10px;">🎖️</div>
+                            <div>NO RECRUITS YET</div>
+                            <div style="margin-top: 10px; font-size: 10px;">
+                                Share your invite code to start building your network
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('modal-influence').textContent = 'NONE';
+                } else {
+                    // Calculate influence level based on recruit count
+                    let influence = 'BUILDING';
+                    if (referralsData.count >= 20) influence = 'MAJOR';
+                    else if (referralsData.count >= 10) influence = 'SIGNIFICANT';
+                    else if (referralsData.count >= 5) influence = 'GROWING';
+
+                    document.getElementById('modal-influence').textContent = influence;
+
+                    list.innerHTML = referralsData.referrals.map(r => `
+                        <div style="display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #004d15; align-items: center;">
+                            <div>
+                                <div style="font-weight: bold;">${r.username}</div>
+                                <div style="font-size: 9px; color: #666;">${r.rank_code || ''} ${r.rank_title || ''}</div>
+                            </div>
+                            <div style="text-align: right; font-size: 10px;">
+                                <div style="color: #ffaa00;">+${r.stake_percentage}% stake</div>
+                                <div style="color: #666;">Joined: ${r.join_date || '--'}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                modal.style.display = 'flex';
+            } catch (err) {
+                console.error('Error loading recruits:', err);
+                showToast('ERROR_LOADING_RECRUITS');
+            }
+        }
+
+        function closeRecruitsModal() {
+            document.getElementById('recruits-modal').style.display = 'none';
         }
 
         // Check for invite code in URL on page load
@@ -5802,24 +5934,42 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
         }
 
         // Complete Verification
-        function completeVerification() {
+        async function completeVerification() {
             // Update final display
             document.getElementById('final-rank').textContent = verificationData.rank + ' CAPTAIN';
             document.getElementById('final-badges').textContent = verificationData.badges.join(', ');
             document.getElementById('final-units').textContent = verificationData.units.join(', ');
-            
+
+            // Use invite code if present
+            const pendingInviteCode = sessionStorage.getItem('pendingInviteCode');
+            if (pendingInviteCode && currentUser) {
+                try {
+                    await api('/api/invites/use', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            code: pendingInviteCode,
+                            userId: currentUser.id
+                        })
+                    });
+                    sessionStorage.removeItem('pendingInviteCode');
+                    showToast('REFERRAL_BONUS_APPLIED! 🎖️');
+                } catch (err) {
+                    console.error('Failed to use invite code:', err);
+                }
+            }
+
             // Transition to main app
             setTimeout(() => {
                 document.getElementById('verification-screen').classList.add('hidden');
                 document.getElementById('main-app').classList.add('active');
-                
+
                 // Update profile with verified data
                 document.getElementById('profile-rank').textContent = verificationData.rank + ' CAPTAIN';
                 document.getElementById('profile-unit').textContent = verificationData.units[0].replace('_', ' ');
                 document.getElementById('user-leaderboard-unit').textContent = verificationData.units[0];
-                
+
                 // Update badges
-                const badgesHtml = verificationData.badges.map(badge => 
+                const badgesHtml = verificationData.badges.map(badge =>
                     `<div class="badge">${badge}</div>`
                 ).join('');
                 document.getElementById('profile-badges').innerHTML = badgesHtml;
