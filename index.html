@@ -3765,6 +3765,18 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 await livekitRoom.connect(tokenData.url, tokenData.token);
                 console.log('Connected to LiveKit room:', tokenData.room);
 
+                // Handle existing participants and their tracks
+                livekitRoom.remoteParticipants.forEach(participant => {
+                    console.log('Found existing participant:', participant.identity);
+
+                    // Subscribe to existing audio tracks
+                    participant.audioTrackPublications.forEach(publication => {
+                        if (publication.isSubscribed && publication.audioTrack) {
+                            handleTrackSubscribed(publication.audioTrack, publication, participant);
+                        }
+                    });
+                });
+
                 // If we can publish (speaker/host), enable mic
                 if (tokenData.canPublish) {
                     await enableLocalAudio();
@@ -3806,12 +3818,32 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
         }
 
         // Handle incoming audio tracks
-        function handleTrackSubscribed(track, publication, participant) {
+        async function handleTrackSubscribed(track, publication, participant) {
             if (track.kind === 'audio') {
                 const audioElement = track.attach();
                 audioElement.id = `audio-${participant.identity}`;
+                audioElement.autoplay = true;
+                audioElement.playsInline = true;
+                audioElement.volume = 1.0; // Full volume
                 document.body.appendChild(audioElement);
-                console.log('Audio track subscribed:', participant.identity);
+
+                // Explicitly play the audio element to ensure it works
+                try {
+                    await audioElement.play();
+                    console.log('Audio track subscribed and playing:', participant.identity);
+                } catch (err) {
+                    console.warn('Audio autoplay blocked for:', participant.identity, err);
+                    // Try again after a small delay
+                    setTimeout(async () => {
+                        try {
+                            await audioElement.play();
+                            console.log('Audio playback retry successful:', participant.identity);
+                        } catch (retryErr) {
+                            console.error('Audio playback failed:', participant.identity, retryErr);
+                            showToast('Audio playback issue - check browser permissions');
+                        }
+                    }, 100);
+                }
             }
         }
 
