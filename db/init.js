@@ -14,6 +14,28 @@ function initDatabase() {
     const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
     db.exec(schema);
 
+    // Run migrations for existing databases
+    try {
+        // Add reply_to_id, attachment_url, attachment_type columns if they don't exist
+        const columns = db.prepare("PRAGMA table_info(messages)").all();
+        const columnNames = columns.map(col => col.name);
+
+        if (!columnNames.includes('reply_to_id')) {
+            db.exec('ALTER TABLE messages ADD COLUMN reply_to_id INTEGER DEFAULT NULL');
+            console.log('Added reply_to_id column to messages table');
+        }
+        if (!columnNames.includes('attachment_url')) {
+            db.exec('ALTER TABLE messages ADD COLUMN attachment_url TEXT DEFAULT NULL');
+            console.log('Added attachment_url column to messages table');
+        }
+        if (!columnNames.includes('attachment_type')) {
+            db.exec('ALTER TABLE messages ADD COLUMN attachment_type TEXT DEFAULT NULL');
+            console.log('Added attachment_type column to messages table');
+        }
+    } catch (err) {
+        console.error('Migration error:', err);
+    }
+
     // Check if data already exists
     const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
     if (userCount.count > 0) {

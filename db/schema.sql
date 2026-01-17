@@ -95,9 +95,13 @@ CREATE TABLE IF NOT EXISTS messages (
     channel_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
     content TEXT NOT NULL,
+    reply_to_id INTEGER DEFAULT NULL,
+    attachment_url TEXT DEFAULT NULL,
+    attachment_type TEXT DEFAULT NULL,
     timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (channel_id) REFERENCES channels(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (reply_to_id) REFERENCES messages(id)
 );
 
 -- Voice stages
