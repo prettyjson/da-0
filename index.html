@@ -6,7 +6,13 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>VETNET_TERMINAL_v2.1.3</title>
+    <title>The O Club</title>
+    <meta name="description" content="The O Club - Voice chat nets for veterans">
+    <meta property="og:title" content="The O Club">
+    <meta property="og:description" content="The O Club - Voice chat nets for veterans">
+    <meta property="og:type" content="website">
+    <meta name="apple-mobile-web-app-title" content="The O Club">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.0/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
@@ -3701,6 +3707,11 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
         let netRefreshInterval = null;
         let netChatRefreshInterval = null;
 
+        // WebSocket for real-time updates
+        let ws = null;
+        let wsReconnectAttempts = 0;
+        const WS_MAX_RECONNECT_ATTEMPTS = 5;
+
         // LiveKit audio state
         let livekitRoom = null;
         let livekitEnabled = false;
@@ -3723,6 +3734,131 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
 
         // Initialize LiveKit check on page load
         document.addEventListener('DOMContentLoaded', checkLivekitConfig);
+
+        // ============ WEBSOCKET REAL-TIME UPDATES ============
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}`;
+
+            console.log('Connecting to WebSocket:', wsUrl);
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log('✓ WebSocket connected');
+                wsReconnectAttempts = 0;
+
+                // If we're in a net, subscribe to updates
+                if (currentNetId) {
+                    ws.send(JSON.stringify({ type: 'subscribe', netId: currentNetId }));
+                }
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    handleWebSocketMessage(message);
+                } catch (err) {
+                    console.error('Error parsing WebSocket message:', err);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                ws = null;
+
+                // Attempt to reconnect if we haven't exceeded max attempts
+                if (wsReconnectAttempts < WS_MAX_RECONNECT_ATTEMPTS) {
+                    wsReconnectAttempts++;
+                    const delay = Math.min(1000 * Math.pow(2, wsReconnectAttempts), 30000);
+                    console.log(`Reconnecting WebSocket in ${delay}ms (attempt ${wsReconnectAttempts}/${WS_MAX_RECONNECT_ATTEMPTS})`);
+                    setTimeout(connectWebSocket, delay);
+                }
+            };
+        }
+
+        function handleWebSocketMessage(message) {
+            const { event, data, netId } = message;
+
+            console.log('WebSocket event:', event, data);
+
+            // Handle global events (not specific to a net)
+            switch (event) {
+                case 'net:created':
+                    // New net was created - refresh the net lists
+                    loadNets();
+                    loadNetsInOverview();
+                    return;
+
+                case 'net:ended':
+                    // A net ended - refresh the net lists
+                    loadNets();
+                    loadNetsInOverview();
+                    // If we're in the net that ended, close it
+                    if (currentNetId && String(data.netId) === String(currentNetId)) {
+                        closeNetRoom();
+                        showToast('NET_ENDED by host');
+                    }
+                    return;
+            }
+
+            // Only process net-specific messages for the current net
+            if (netId && String(netId) !== String(currentNetId)) {
+                return;
+            }
+
+            switch (event) {
+                case 'net:message':
+                    // New chat message received
+                    appendNetMessage(data);
+                    break;
+
+                case 'net:participant:join':
+                case 'net:participant:leave':
+                case 'net:participant:role':
+                case 'net:participant:mute':
+                case 'net:request:new':
+                case 'net:request:denied':
+                    // Any participant or request change - reload the net room
+                    loadNetRoom();
+                    break;
+
+                default:
+                    console.log('Unhandled WebSocket event:', event);
+            }
+        }
+
+        function appendNetMessage(message) {
+            const chatContainer = document.getElementById('net-chat-messages');
+            if (!chatContainer) return;
+
+            const shouldScroll = chatContainer.scrollTop + chatContainer.clientHeight >= chatContainer.scrollHeight - 50;
+
+            const time = new Date(message.timestamp);
+            const timeStr = `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.style.marginBottom = '8px';
+            messageDiv.innerHTML = `
+                <span style="color: #ffaa00;">${message.username}</span>
+                <span style="color: #666; font-size: 9px;">[${timeStr}]</span>
+                <div>${message.content}</div>
+            `;
+
+            chatContainer.appendChild(messageDiv);
+
+            if (shouldScroll) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        }
+
+        // Connect WebSocket on page load
+        document.addEventListener('DOMContentLoaded', connectWebSocket);
 
         // Connect to LiveKit room
         async function connectToLiveKitRoom(netId) {
@@ -4169,12 +4305,19 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 await loadNetRoom();
                 document.getElementById('net-popup').classList.add('show');
 
+                // Subscribe to WebSocket updates for this net
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'subscribe', netId: currentNetId }));
+                    console.log('Subscribed to WebSocket updates for net', currentNetId);
+                }
+
                 // Connect to LiveKit for real audio
                 await connectToLiveKitRoom(netId);
 
-                // Start auto-refresh
-                netRefreshInterval = setInterval(loadNetRoom, 5000);
-                netChatRefreshInterval = setInterval(loadNetChat, 3000);
+                // Keep chat polling as fallback (reduced frequency since WebSocket handles it)
+                netChatRefreshInterval = setInterval(loadNetChat, 30000);
+                // Keep room state polling as fallback in case WebSocket drops
+                netRefreshInterval = setInterval(loadNetRoom, 10000);
 
             } catch (err) {
                 showToast('Error joining net');
@@ -4480,6 +4623,13 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
         function closeNetRoom() {
             document.getElementById('net-popup').classList.remove('show');
             document.getElementById('net-mini-player').classList.remove('show');
+
+            // Unsubscribe from WebSocket updates
+            if (ws && ws.readyState === WebSocket.OPEN && currentNetId) {
+                ws.send(JSON.stringify({ type: 'unsubscribe' }));
+                console.log('Unsubscribed from WebSocket updates');
+            }
+
             currentNetId = null;
             currentNetData = null;
             previousNetRole = null;
