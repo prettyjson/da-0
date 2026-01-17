@@ -3087,6 +3087,18 @@ AUG  $24.9M  ██████████████████████�
         </div>
     </div>
 
+    <!-- Message Context Menu -->
+    <div id="message-context-menu" style="display: none; position: fixed; z-index: 10000; background: #0a0a0a; border: 1px solid #00ff41; box-shadow: 0 4px 12px rgba(0, 255, 65, 0.3); min-width: 150px;">
+        <div onclick="contextMenuReply()" style="padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #004d15; display: flex; align-items: center; gap: 10px;" onmouseover="this.style.background='rgba(0, 255, 65, 0.1)'" onmouseout="this.style.background='transparent'">
+            <span style="font-size: 14px;">↩</span>
+            <span style="color: #00ff41;">Reply</span>
+        </div>
+        <div onclick="contextMenuCopyText()" style="padding: 10px 15px; cursor: pointer; display: flex; align-items: center; gap: 10px;" onmouseover="this.style.background='rgba(0, 255, 65, 0.1)'" onmouseout="this.style.background='transparent'">
+            <span style="font-size: 14px;">📋</span>
+            <span style="color: #00ff41;">Copy Text</span>
+        </div>
+    </div>
+
     <div class="system-info">
         SYSTEM_STATUS: OPERATIONAL | PING: 23ms | LAST_SYNC: 11AUG25_0847Z
     </div>
@@ -3559,6 +3571,8 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
+        let contextMenuData = { messageId: null, username: null, content: null };
+
         function appendMessage(msg, container) {
             const timestamp = new Date(msg.timestamp);
             const timeStr = `[${String(timestamp.getUTCHours()).padStart(2, '0')}${String(timestamp.getUTCMinutes()).padStart(2, '0')}Z]`;
@@ -3566,6 +3580,9 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message';
             messageDiv.dataset.messageId = msg.id;
+            messageDiv.dataset.username = msg.username;
+            messageDiv.dataset.content = msg.content || '';
+            messageDiv.style.cursor = 'context-menu';
 
             let replyHTML = '';
             if (msg.reply_to_id) {
@@ -3589,12 +3606,34 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 <div class="message-header">
                     <span>${msg.username}</span>
                     <span class="timestamp">${timeStr}</span>
-                    <button onclick="setReplyTo(${msg.id}, '${msg.username}', '${(msg.content || '').replace(/'/g, "\\'")}')}" style="margin-left: 10px; font-size: 9px; padding: 2px 6px; background: rgba(0, 255, 65, 0.1); border: 1px solid #00ff41; color: #00ff41; cursor: pointer;">REPLY</button>
                 </div>
                 ${replyHTML}
                 <div>${msg.content || ''}</div>
                 ${imageHTML}
             `;
+
+            // Add right-click handler
+            messageDiv.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+                showContextMenu(e, msg.id, msg.username, msg.content || '');
+            });
+
+            // Add long-press handler for mobile
+            let pressTimer;
+            messageDiv.addEventListener('touchstart', function(e) {
+                pressTimer = setTimeout(function() {
+                    const touch = e.touches[0];
+                    showContextMenu({ clientX: touch.clientX, clientY: touch.clientY }, msg.id, msg.username, msg.content || '');
+                }, 500);
+            });
+
+            messageDiv.addEventListener('touchend', function() {
+                clearTimeout(pressTimer);
+            });
+
+            messageDiv.addEventListener('touchmove', function() {
+                clearTimeout(pressTimer);
+            });
 
             if (!container) {
                 container = document.getElementById('chat-messages');
@@ -3645,6 +3684,53 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             replyToMessageId = null;
             replyToUsername = null;
             document.getElementById('reply-indicator').style.display = 'none';
+        }
+
+        // ============ MESSAGE CONTEXT MENU ============
+        function showContextMenu(event, messageId, username, content) {
+            const menu = document.getElementById('message-context-menu');
+
+            // Store message data for context menu actions
+            contextMenuData = { messageId, username, content };
+
+            // Position the menu
+            menu.style.display = 'block';
+            menu.style.left = event.clientX + 'px';
+            menu.style.top = event.clientY + 'px';
+
+            // Close menu when clicking anywhere else
+            setTimeout(() => {
+                document.addEventListener('click', closeContextMenu, { once: true });
+            }, 0);
+        }
+
+        function closeContextMenu() {
+            document.getElementById('message-context-menu').style.display = 'none';
+        }
+
+        function contextMenuReply() {
+            if (contextMenuData.messageId) {
+                setReplyTo(contextMenuData.messageId, contextMenuData.username, contextMenuData.content);
+            }
+            closeContextMenu();
+        }
+
+        function contextMenuCopyText() {
+            if (contextMenuData.content) {
+                navigator.clipboard.writeText(contextMenuData.content).then(() => {
+                    showToast('Text copied');
+                }).catch(() => {
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = contextMenuData.content;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    showToast('Text copied');
+                });
+            }
+            closeContextMenu();
         }
 
         function handleImageSelect(event) {
@@ -5223,6 +5309,19 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                     }
                 });
             }
+
+            // Close context menu on scroll
+            const chatMessages = document.getElementById('chat-messages');
+            if (chatMessages) {
+                chatMessages.addEventListener('scroll', closeContextMenu);
+            }
+
+            // Close context menu on Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeContextMenu();
+                }
+            });
         });
 
         setInterval(function() {
