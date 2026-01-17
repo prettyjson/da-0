@@ -759,11 +759,11 @@
             background: #0a0a0a;
             border: 1px solid #00ff41;
             border-radius: 8px;
-            padding: 8px;
+            padding: 12px;
             box-shadow: 0 4px 12px rgba(0, 255, 65, 0.3);
             z-index: 10000;
             flex-wrap: wrap;
-            gap: 6px;
+            gap: 8px;
             max-width: 200px;
         }
 
@@ -772,16 +772,44 @@
         }
 
         .reaction-picker-emoji {
-            font-size: 18px;
+            font-size: 24px;
             cursor: pointer;
-            padding: 4px 6px;
-            border-radius: 4px;
+            padding: 8px 10px;
+            border-radius: 6px;
             transition: all 0.15s;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .reaction-picker-emoji:hover {
             background: rgba(0, 255, 65, 0.15);
             transform: scale(1.2);
+        }
+
+        .reaction-picker-emoji:active {
+            background: rgba(0, 255, 65, 0.25);
+            transform: scale(1.1);
+        }
+
+        /* Mobile-specific styling */
+        @media (max-width: 768px) {
+            .reaction-picker {
+                padding: 16px;
+                gap: 12px;
+                max-width: 280px;
+                border-width: 2px;
+            }
+
+            .reaction-picker-emoji {
+                font-size: 32px;
+                padding: 12px 14px;
+                min-width: 56px;
+                min-height: 56px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
         }
 
         .reaction-tooltip {
@@ -3202,17 +3230,11 @@ AUG  $24.9M  ██████████████████████�
         </div>
     </div>
 
+    <!-- Reaction Picker Backdrop (for mobile) -->
+    <div id="reaction-picker-backdrop" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.7); z-index: 9999;"></div>
+
     <!-- Reaction Picker -->
-    <div id="reaction-picker" class="reaction-picker">
-        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('👍')">👍</div>
-        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('👎')">👎</div>
-        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('😊')">😊</div>
-        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('😅')">😅</div>
-        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('😂')">😂</div>
-        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('🔫')">🔫</div>
-        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('💥')">💥</div>
-        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('🔥')">🔥</div>
-    </div>
+    <div id="reaction-picker" class="reaction-picker"></div>
 
     <!-- Terminal Modal -->
     <div id="terminal-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.9); z-index: 20000; align-items: center; justify-content: center;">
@@ -3755,10 +3777,8 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 <div class="message-reactions" id="reactions-${msg.id}"></div>
             `;
 
-            // Render reactions if any
-            if (msg.reactions) {
-                renderReactions(msg.id, msg.reactions);
-            }
+            // Always render reactions container (will show "+" button even if no reactions)
+            renderReactions(msg.id, msg.reactions || {});
 
             // Add right-click handler
             messageDiv.addEventListener('contextmenu', function(e) {
@@ -3904,38 +3924,54 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             container.innerHTML = '';
 
             // Render each reaction type
-            Object.keys(reactions).forEach(emoji => {
-                const reactionData = reactions[emoji];
-                const userReacted = currentUser && reactionData.users.some(u => u.id === currentUser.id);
+            if (reactions && Object.keys(reactions).length > 0) {
+                Object.keys(reactions).forEach(emoji => {
+                    const reactionData = reactions[emoji];
+                    const userReacted = currentUser && reactionData.users.some(u => u.id === currentUser.id);
 
-                const reactionEl = document.createElement('div');
-                reactionEl.className = 'reaction-item' + (userReacted ? ' user-reacted' : '');
-                reactionEl.innerHTML = `${emoji} <span style="color: #666;">${reactionData.count}</span>`;
-                reactionEl.dataset.emoji = emoji;
-                reactionEl.dataset.messageId = messageId;
+                    const reactionEl = document.createElement('div');
+                    reactionEl.className = 'reaction-item' + (userReacted ? ' user-reacted' : '');
+                    reactionEl.innerHTML = `${emoji} <span style="color: #666;">${reactionData.count}</span>`;
+                    reactionEl.dataset.emoji = emoji;
+                    reactionEl.dataset.messageId = messageId;
 
-                // Click to toggle reaction
-                reactionEl.addEventListener('click', function() {
-                    toggleReaction(messageId, emoji);
+                    // Click to toggle reaction
+                    reactionEl.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        toggleReaction(messageId, emoji);
+                    });
+
+                    // Touch handling for mobile
+                    reactionEl.addEventListener('touchend', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleReaction(messageId, emoji);
+                    });
+
+                    // Hover to show who reacted (desktop only)
+                    reactionEl.addEventListener('mouseenter', function(e) {
+                        showReactionTooltip(e, reactionData.users);
+                    });
+
+                    reactionEl.addEventListener('mouseleave', function() {
+                        hideReactionTooltip();
+                    });
+
+                    container.appendChild(reactionEl);
                 });
+            }
 
-                // Hover to show who reacted
-                reactionEl.addEventListener('mouseenter', function(e) {
-                    showReactionTooltip(e, reactionData.users);
-                });
-
-                reactionEl.addEventListener('mouseleave', function() {
-                    hideReactionTooltip();
-                });
-
-                container.appendChild(reactionEl);
-            });
-
-            // Add "+" button to add new reactions
+            // Always add "+" button to add new reactions
             const addBtn = document.createElement('div');
             addBtn.className = 'reaction-add-btn';
             addBtn.textContent = '+';
             addBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                showReactionPicker(e, messageId);
+            });
+            addBtn.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
                 showReactionPicker(e, messageId);
             });
             container.appendChild(addBtn);
@@ -3983,24 +4019,72 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
 
         function showReactionPicker(event, messageId) {
             const picker = document.getElementById('reaction-picker');
+            const backdrop = document.getElementById('reaction-picker-backdrop');
             currentReactionMessageId = messageId;
 
-            // Position picker near the click
-            picker.style.left = event.pageX + 'px';
-            picker.style.top = (event.pageY - 60) + 'px';
+            // Clear previous emojis
+            picker.innerHTML = '';
+
+            // Available reaction emojis
+            const emojis = ['👍', '👎', '😊', '😅', '😂', '🔫', '💥', '🔥'];
+
+            // Create emoji buttons with proper event handling
+            emojis.forEach(emoji => {
+                const emojiBtn = document.createElement('div');
+                emojiBtn.className = 'reaction-picker-emoji';
+                emojiBtn.textContent = emoji;
+
+                // Handle both click and touch
+                const handleReaction = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    addReaction(emoji);
+                };
+
+                emojiBtn.addEventListener('click', handleReaction);
+                emojiBtn.addEventListener('touchend', handleReaction);
+
+                picker.appendChild(emojiBtn);
+            });
+
+            // Check if mobile (screen width < 768px)
+            const isMobile = window.innerWidth < 768;
+
+            if (isMobile) {
+                // On mobile, show backdrop and center the picker
+                backdrop.style.display = 'block';
+                backdrop.addEventListener('click', closeReactionPicker, { once: true });
+                backdrop.addEventListener('touchend', closeReactionPicker, { once: true });
+
+                picker.style.left = '50%';
+                picker.style.top = '50%';
+                picker.style.transform = 'translate(-50%, -50%)';
+                picker.style.position = 'fixed';
+            } else {
+                // On desktop, position near the click
+                picker.style.position = 'absolute';
+                picker.style.transform = 'none';
+                picker.style.left = event.pageX + 'px';
+                picker.style.top = (event.pageY - 60) + 'px';
+
+                // Close picker when clicking outside (desktop only)
+                setTimeout(() => {
+                    document.addEventListener('click', closeReactionPicker, { once: true });
+                }, 200);
+            }
+
             picker.classList.add('show');
 
-            // Close picker when clicking outside
-            setTimeout(() => {
-                document.addEventListener('click', closeReactionPicker, { once: true });
-            }, 10);
-
             event.stopPropagation();
+            if (event.preventDefault) event.preventDefault();
         }
 
         function closeReactionPicker() {
             const picker = document.getElementById('reaction-picker');
+            const backdrop = document.getElementById('reaction-picker-backdrop');
+
             picker.classList.remove('show');
+            backdrop.style.display = 'none';
             currentReactionMessageId = null;
         }
 
