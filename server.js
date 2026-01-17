@@ -40,12 +40,13 @@ wss.on('connection', (ws) => {
 
             // Handle subscription to net updates
             if (data.type === 'subscribe' && data.netId) {
-                if (!netClients.has(data.netId)) {
-                    netClients.set(data.netId, new Set());
+                const netIdStr = String(data.netId);
+                if (!netClients.has(netIdStr)) {
+                    netClients.set(netIdStr, new Set());
                 }
-                netClients.get(data.netId).add(ws);
-                ws.currentNetId = data.netId;
-                console.log(`Client subscribed to net ${data.netId}`);
+                netClients.get(netIdStr).add(ws);
+                ws.currentNetId = netIdStr;
+                console.log(`Client subscribed to net ${netIdStr}`);
             }
 
             // Handle unsubscribe
