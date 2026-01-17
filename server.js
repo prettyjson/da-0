@@ -1,11 +1,15 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const http = require('http');
+const WebSocket = require('ws');
 const { initDatabase, getDatabase } = require('./db/init');
 const { AccessToken } = require('livekit-server-sdk');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 
 // LiveKit configuration (set these in your environment)
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || '';
@@ -22,6 +26,85 @@ app.use(express.static(path.join(__dirname)));
 
 // Helper to get DB connection
 const db = () => getDatabase();
+
+// ============ WEBSOCKET SETUP ============
+// Track connected clients by net ID
+const netClients = new Map(); // netId -> Set of WebSocket clients
+
+wss.on('connection', (ws) => {
+    console.log('WebSocket client connected');
+
+    ws.on('message', (message) => {
+        try {
+            const data = JSON.parse(message);
+
+            // Handle subscription to net updates
+            if (data.type === 'subscribe' && data.netId) {
+                if (!netClients.has(data.netId)) {
+                    netClients.set(data.netId, new Set());
+                }
+                netClients.get(data.netId).add(ws);
+                ws.currentNetId = data.netId;
+                console.log(`Client subscribed to net ${data.netId}`);
+            }
+
+            // Handle unsubscribe
+            if (data.type === 'unsubscribe' && ws.currentNetId) {
+                const clients = netClients.get(ws.currentNetId);
+                if (clients) {
+                    clients.delete(ws);
+                }
+                ws.currentNetId = null;
+                console.log('Client unsubscribed from net');
+            }
+        } catch (err) {
+            console.error('Error parsing WebSocket message:', err);
+        }
+    });
+
+    ws.on('close', () => {
+        // Clean up subscriptions
+        if (ws.currentNetId) {
+            const clients = netClients.get(ws.currentNetId);
+            if (clients) {
+                clients.delete(ws);
+                if (clients.size === 0) {
+                    netClients.delete(ws.currentNetId);
+                }
+            }
+        }
+        console.log('WebSocket client disconnected');
+    });
+});
+
+// Broadcast function to send updates to all clients subscribed to a specific net
+function broadcastToNet(netId, event, data) {
+    const clients = netClients.get(String(netId));
+    if (!clients) return;
+
+    const message = JSON.stringify({ event, data, netId });
+
+    clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+        }
+    });
+
+    console.log(`Broadcast ${event} to ${clients.size} clients in net ${netId}`);
+}
+
+// Broadcast to all connected clients
+function broadcastToAll(event, data) {
+    const message = JSON.stringify({ event, data });
+
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+        }
+    });
+
+    console.log(`Broadcast ${event} to ${wss.clients.size} clients`);
+}
 
 // ============ AUTH ROUTES (spoofed) ============
 app.post('/api/auth/login', (req, res) => {
@@ -606,6 +689,9 @@ app.post('/api/nets/:id/join', (req, res) => {
         WHERE np.net_id = ? AND np.user_id = ?
     `).get(netId, userId);
 
+    // Broadcast participant update to all clients in this net
+    broadcastToNet(netId, 'net:participant:join', participant);
+
     res.json({ success: true, participant, hostReclaimed: isOriginalHost });
 });
 
@@ -618,6 +704,9 @@ app.post('/api/nets/:id/leave', (req, res) => {
         UPDATE net_participants SET left_at = ?
         WHERE net_id = ? AND user_id = ?
     `).run(new Date().toISOString(), netId, userId);
+
+    // Broadcast participant leave to all clients in this net
+    broadcastToNet(netId, 'net:participant:leave', { userId });
 
     res.json({ success: true });
 });
@@ -694,7 +783,16 @@ app.post('/api/nets/:id/request-speak', (req, res) => {
         VALUES (?, ?, 'pending')
     `).run(netId, userId);
 
-    const request = db().prepare('SELECT * FROM speak_requests WHERE id = ?').get(result.lastInsertRowid);
+    const request = db().prepare(`
+        SELECT sr.*, u.username
+        FROM speak_requests sr
+        JOIN users u ON sr.user_id = u.id
+        WHERE sr.id = ?
+    `).get(result.lastInsertRowid);
+
+    // Broadcast new speak request to all clients in this net (hosts need to see it)
+    broadcastToNet(netId, 'net:request:new', request);
+
     res.json({ success: true, request });
 });
 
@@ -746,6 +844,9 @@ app.post('/api/nets/:id/approve-speaker', (req, res) => {
         WHERE net_id = ? AND user_id = ?
     `).run(netId, targetUserId);
 
+    // Broadcast role change to all clients in this net
+    broadcastToNet(netId, 'net:participant:role', { userId: targetUserId, role: 'speaker', isMuted: false });
+
     res.json({ success: true });
 });
 
@@ -767,6 +868,9 @@ app.post('/api/nets/:id/deny-speaker', (req, res) => {
         UPDATE speak_requests SET status = 'denied', resolved_at = ?, resolved_by = ?
         WHERE id = ?
     `).run(new Date().toISOString(), userId, requestId);
+
+    // Broadcast request denial to all clients in this net
+    broadcastToNet(netId, 'net:request:denied', { requestId });
 
     res.json({ success: true });
 });
@@ -790,6 +894,9 @@ app.post('/api/nets/:id/demote-speaker', (req, res) => {
         WHERE net_id = ? AND user_id = ?
     `).run(netId, targetUserId);
 
+    // Broadcast role change to all clients in this net
+    broadcastToNet(netId, 'net:participant:role', { userId: targetUserId, role: 'listener', isMuted: true });
+
     res.json({ success: true });
 });
 
@@ -811,6 +918,9 @@ app.post('/api/nets/:id/toggle-mute', (req, res) => {
         UPDATE net_participants SET is_muted = ?
         WHERE net_id = ? AND user_id = ?
     `).run(newMuteState, netId, userId);
+
+    // Broadcast mute state change to all clients in this net
+    broadcastToNet(netId, 'net:participant:mute', { userId, isMuted: Boolean(newMuteState) });
 
     res.json({ success: true, is_muted: newMuteState });
 });
@@ -854,6 +964,9 @@ app.post('/api/nets/:id/messages', (req, res) => {
         JOIN users u ON nm.user_id = u.id
         WHERE nm.id = ?
     `).get(result.lastInsertRowid);
+
+    // Broadcast new message to all clients in this net
+    broadcastToNet(netId, 'net:message', message);
 
     res.json(message);
 });
@@ -982,6 +1095,7 @@ app.get('/{*path}', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.listen(PORT, () => {
-    console.log(`VETNET Terminal Server running on http://localhost:${PORT}`);
+server.listen(PORT, () => {
+    console.log(`The O Club Server running on http://localhost:${PORT}`);
+    console.log(`WebSocket server ready for real-time updates`);
 });
