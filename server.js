@@ -208,6 +208,26 @@ app.get('/api/members/username/:username', (req, res) => {
     res.json(user);
 });
 
+// Search users (for DM creation)
+app.get('/api/users/search', (req, res) => {
+    const { q } = req.query;
+
+    if (!q || q.trim().length < 2) {
+        return res.json([]);
+    }
+
+    const searchTerm = `%${q.toUpperCase()}%`;
+    const users = db().prepare(`
+        SELECT id, username, rank_code, rank_title, unit
+        FROM users
+        WHERE username LIKE ?
+        ORDER BY username ASC
+        LIMIT 20
+    `).all(searchTerm);
+
+    res.json(users);
+});
+
 // ============ PROPOSALS/VOTES ROUTES ============
 app.get('/api/proposals', (req, res) => {
     const { status } = req.query;
@@ -336,13 +356,13 @@ app.get('/api/channels/:id/messages', (req, res) => {
 });
 
 app.post('/api/channels/:id/messages', (req, res) => {
-    const { userId, content } = req.body;
+    const { userId, content, replyToId, attachmentUrl, attachmentType } = req.body;
     const channelId = req.params.id;
 
     const result = db().prepare(`
-        INSERT INTO messages (channel_id, user_id, content, timestamp)
-        VALUES (?, ?, ?, ?)
-    `).run(channelId, userId, content, new Date().toISOString());
+        INSERT INTO messages (channel_id, user_id, content, reply_to_id, attachment_url, attachment_type, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(channelId, userId, content || '', replyToId || null, attachmentUrl || null, attachmentType || null, new Date().toISOString());
 
     const message = db().prepare(`
         SELECT m.*, u.username
@@ -351,7 +371,112 @@ app.post('/api/channels/:id/messages', (req, res) => {
         WHERE m.id = ?
     `).get(result.lastInsertRowid);
 
+    // Broadcast message to all clients
+    broadcastToAll('channel:message', { channelId, message });
+
     res.json(message);
+});
+
+// Create a new channel
+app.post('/api/channels', (req, res) => {
+    const { userId, name, isPrivate } = req.body;
+
+    if (!name || name.trim().length === 0) {
+        return res.status(400).json({ error: 'Channel name is required' });
+    }
+
+    // Check if channel name already exists
+    const existing = db().prepare('SELECT * FROM channels WHERE name = ? AND type = ?').get(name.toUpperCase(), 'channel');
+    if (existing) {
+        return res.status(400).json({ error: 'Channel name already exists' });
+    }
+
+    const result = db().prepare(`
+        INSERT INTO channels (name, type, is_private, member_count, created_at)
+        VALUES (?, 'channel', ?, 0, ?)
+    `).run(name.toUpperCase(), isPrivate ? 1 : 0, new Date().toISOString());
+
+    const channel = db().prepare('SELECT * FROM channels WHERE id = ?').get(result.lastInsertRowid);
+
+    // Add creator as member if private
+    if (isPrivate) {
+        db().prepare(`
+            INSERT INTO channel_members (channel_id, user_id)
+            VALUES (?, ?)
+        `).run(channel.id, userId);
+    }
+
+    // Broadcast new channel to all clients
+    broadcastToAll('channel:created', channel);
+
+    res.json(channel);
+});
+
+// Create or get existing DM
+app.post('/api/dms/create', (req, res) => {
+    const { userId, targetUserId } = req.body;
+
+    if (!targetUserId) {
+        return res.status(400).json({ error: 'Target user is required' });
+    }
+
+    if (userId === targetUserId) {
+        return res.status(400).json({ error: 'Cannot create DM with yourself' });
+    }
+
+    // Check if DM already exists between these two users
+    const existingDMs = db().prepare(`
+        SELECT c.* FROM channels c
+        WHERE c.type = 'dm'
+        AND c.id IN (
+            SELECT channel_id FROM channel_members WHERE user_id = ?
+        )
+        AND c.id IN (
+            SELECT channel_id FROM channel_members WHERE user_id = ?
+        )
+    `).all(userId, targetUserId);
+
+    if (existingDMs.length > 0) {
+        // DM already exists, return it with member info
+        const dm = existingDMs[0];
+        const members = db().prepare(`
+            SELECT u.id, u.username FROM users u
+            JOIN channel_members cm ON cm.user_id = u.id
+            WHERE cm.channel_id = ?
+        `).all(dm.id);
+        return res.json({ ...dm, members });
+    }
+
+    // Create new DM channel
+    const targetUser = db().prepare('SELECT username FROM users WHERE id = ?').get(targetUserId);
+    if (!targetUser) {
+        return res.status(404).json({ error: 'Target user not found' });
+    }
+
+    const dmName = `DM_${targetUser.username}`;
+
+    const result = db().prepare(`
+        INSERT INTO channels (name, type, is_private, member_count, created_at)
+        VALUES (?, 'dm', 1, 2, ?)
+    `).run(dmName, new Date().toISOString());
+
+    const channelId = result.lastInsertRowid;
+
+    // Add both users as members
+    db().prepare(`INSERT INTO channel_members (channel_id, user_id) VALUES (?, ?)`).run(channelId, userId);
+    db().prepare(`INSERT INTO channel_members (channel_id, user_id) VALUES (?, ?)`).run(channelId, targetUserId);
+
+    const dm = db().prepare('SELECT * FROM channels WHERE id = ?').get(channelId);
+    const members = db().prepare(`
+        SELECT u.id, u.username FROM users u
+        JOIN channel_members cm ON cm.user_id = u.id
+        WHERE cm.channel_id = ?
+    `).all(channelId);
+
+    // Broadcast new DM to both users
+    broadcastToAll('dm:created', { ...dm, members });
+
+    res.json({ ...dm, members });
 });
 
 // ============ STAGES (VOICE CHANNELS) ROUTES ============

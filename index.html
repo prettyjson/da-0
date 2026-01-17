@@ -3410,7 +3410,12 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             const channels = await api('/api/channels');
             const chatList = document.querySelector('.chat-list');
 
-            chatList.innerHTML = '<div style="font-weight: bold; margin-bottom: 15px; color: #00ff41;">CHANNELS</div>';
+            chatList.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div style="font-weight: bold; color: #00ff41;">CHANNELS</div>
+                    <button onclick="openCreateChannelModal()" style="font-size: 9px; padding: 2px 6px; background: rgba(0, 255, 65, 0.1); border: 1px solid #00ff41; color: #00ff41; cursor: pointer;">+ NEW</button>
+                </div>
+            `;
 
             const regularChannels = channels.filter(c => c.type === 'channel');
             const dmChannels = channels.filter(c => c.type === 'dm');
@@ -3428,7 +3433,14 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 chatList.appendChild(room);
             });
 
-            chatList.innerHTML += '<div style="margin: 15px 0; font-weight: bold; color: #00ff41;">DIRECT_MSG</div>';
+            const dmHeader = document.createElement('div');
+            dmHeader.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 15px 0 10px 0;">
+                    <div style="font-weight: bold; color: #00ff41;">DIRECT_MSG</div>
+                    <button onclick="openNewDMModal()" style="font-size: 9px; padding: 2px 6px; background: rgba(0, 255, 65, 0.1); border: 1px solid #00ff41; color: #00ff41; cursor: pointer;">+ NEW</button>
+                </div>
+            `;
+            chatList.appendChild(dmHeader);
 
             dmChannels.forEach(channel => {
                 channelIdMap[channel.name.toLowerCase()] = channel.id;
