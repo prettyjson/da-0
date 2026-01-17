@@ -9,7 +9,51 @@
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
-        
+
+        :root {
+            /* Colors */
+            --primary-color: #00ff41;
+            --bg-dark: #0a0a0a;
+            --border-dark: #004d15;
+            --text-gray: #888;
+            --text-gray-dark: #666;
+            --error-color: #ff0000;
+            --warning-color: #ffaa00;
+
+            /* Opacity variants */
+            --primary-alpha-02: rgba(0, 255, 65, 0.02);
+            --primary-alpha-05: rgba(0, 255, 65, 0.05);
+            --primary-alpha-10: rgba(0, 255, 65, 0.1);
+            --primary-alpha-20: rgba(0, 255, 65, 0.2);
+            --primary-alpha-30: rgba(0, 255, 65, 0.3);
+            --bg-alpha-95: rgba(0, 0, 0, 0.95);
+
+            /* Spacing */
+            --spacing-xs: 5px;
+            --spacing-sm: 10px;
+            --spacing-md: 15px;
+            --spacing-lg: 20px;
+            --spacing-xl: 30px;
+            --spacing-2xl: 40px;
+
+            /* Font sizes */
+            --font-xs: 10px;
+            --font-sm: 11px;
+            --font-base: 12px;
+            --font-lg: 18px;
+            --font-xl: 24px;
+            --font-2xl: 32px;
+            --font-3xl: 48px;
+
+            /* Borders */
+            --border-width: 1px;
+            --border-width-md: 2px;
+            --border-width-lg: 3px;
+
+            /* Touch targets (mobile) */
+            --touch-target-min: 44px;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -18,11 +62,11 @@
 
         body {
             font-family: 'JetBrains Mono', 'Courier New', monospace;
-            background: #0a0a0a;
-            color: #00ff41;
+            background: var(--bg-dark);
+            color: var(--primary-color);
             min-height: 100vh;
             overflow-x: auto;
-            font-size: 12px;
+            font-size: var(--font-base);
             line-height: 1.4;
         }
 
@@ -108,6 +152,11 @@
             box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
         }
 
+        .btn-primary:active {
+            background: rgba(0, 255, 65, 0.2);
+            transform: scale(0.98);
+        }
+
         .btn-secondary {
             width: 100%;
             padding: 12px;
@@ -124,6 +173,11 @@
         .btn-secondary:hover {
             border-color: #00ff41;
             color: #00ff41;
+        }
+
+        .btn-secondary:active {
+            background: rgba(0, 255, 65, 0.1);
+            transform: scale(0.98);
         }
 
         .auth-divider {
@@ -385,6 +439,10 @@
             transition: all 0.2s;
         }
 
+        .stage-item:active {
+            background: rgba(0, 255, 65, 0.1);
+        }
+
         .stage-item:last-child {
             border-bottom: none;
         }
@@ -493,6 +551,10 @@
             transition: all 0.2s;
         }
 
+        .vote-item:active {
+            background: rgba(0, 255, 65, 0.1);
+        }
+
         .vote-item:last-child {
             border-bottom: none;
         }
@@ -552,6 +614,11 @@
             background: rgba(0, 255, 65, 0.1);
             border-color: #00ff41;
             color: #00ff41;
+        }
+
+        .nav-tab:active {
+            transform: scale(0.98);
+            background: rgba(0, 255, 65, 0.05);
         }
 
         .section {
@@ -749,6 +816,250 @@
 
         .hidden {
             display: none !important;
+        }
+
+        /* ===== MOBILE RESPONSIVE STYLES ===== */
+
+        /* Tablet and below */
+        @media (max-width: 768px) {
+            body {
+                font-size: 11px;
+            }
+
+            /* Stack main grid */
+            .main-grid {
+                grid-template-columns: 1fr;
+                gap: var(--spacing-md);
+            }
+
+            /* Stack treasury grid */
+            .treasury-grid {
+                grid-template-columns: 1fr;
+                gap: var(--spacing-md);
+            }
+
+            /* Simplify members table for tablet */
+            .table-row {
+                grid-template-columns: 40px 1fr 80px 80px;
+                font-size: 11px;
+            }
+
+            /* Hide less important columns on tablet */
+            .table-row .table-cell:nth-child(3) {
+                display: none;
+            }
+
+            /* Navigation improvements */
+            .nav-tabs {
+                flex-wrap: wrap;
+                gap: var(--spacing-sm);
+            }
+
+            .nav-tab {
+                flex: 1 1 auto;
+                min-width: 100px;
+                padding: var(--spacing-sm) var(--spacing-md);
+            }
+
+            /* Terminal header */
+            .terminal-header {
+                padding: var(--spacing-sm);
+            }
+
+            .header-line {
+                flex-direction: column;
+                gap: var(--spacing-xs);
+            }
+
+            /* Auth box padding */
+            .auth-box {
+                padding: var(--spacing-lg);
+            }
+        }
+
+        /* Mobile phones */
+        @media (max-width: 480px) {
+            body {
+                font-size: var(--font-xs);
+                padding: 0;
+                overflow-x: hidden;
+                word-wrap: break-word;
+            }
+
+            /* Reduce padding globally */
+            .terminal-container {
+                padding: var(--spacing-sm);
+            }
+
+            /* Stack all grids to single column */
+            .main-grid,
+            .treasury-grid {
+                grid-template-columns: 1fr;
+                gap: var(--spacing-sm);
+            }
+
+            /* Mobile-friendly table */
+            .table-row {
+                grid-template-columns: 30px 1fr 60px;
+                font-size: var(--font-xs);
+                padding: 6px 0;
+            }
+
+            /* Hide even more columns on mobile */
+            .table-row .table-cell:nth-child(3),
+            .table-row .table-cell:nth-child(4) {
+                display: none;
+            }
+
+            /* Navigation stack */
+            .nav-tabs {
+                flex-direction: column;
+                gap: var(--spacing-xs);
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .nav-tab {
+                width: 100%;
+                min-height: var(--touch-target-min);
+                padding: var(--spacing-md) var(--spacing-sm);
+                text-align: left;
+                font-size: var(--font-sm);
+            }
+
+            /* Logout button on mobile */
+            .nav-tab[onclick="logout()"] {
+                margin-left: 0 !important;
+                margin-top: var(--spacing-sm);
+            }
+
+            /* Header improvements */
+            .terminal-header {
+                padding: var(--spacing-xs);
+                font-size: var(--font-xs);
+            }
+
+            .header-line {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: var(--spacing-xs);
+            }
+
+            /* Auth screen mobile */
+            .auth-container {
+                padding: var(--spacing-sm);
+            }
+
+            .auth-box {
+                padding: var(--spacing-lg);
+                border-width: var(--border-width);
+            }
+
+            .auth-logo {
+                font-size: var(--font-xl);
+            }
+
+            /* Forms touch-friendly */
+            .form-input,
+            .btn-primary,
+            .btn-secondary {
+                min-height: var(--touch-target-min);
+                font-size: var(--font-base);
+            }
+
+            /* Stats sections */
+            .stats-section,
+            .live-stages,
+            .members-table,
+            .treasury-box,
+            .chart-container,
+            .votes-section {
+                padding: var(--spacing-sm);
+                margin-bottom: var(--spacing-sm);
+            }
+
+            /* Big numbers smaller on mobile */
+            .big-number {
+                font-size: var(--font-lg);
+            }
+
+            /* Reduce stage item hover padding */
+            .stage-item,
+            .vote-item {
+                padding: var(--spacing-sm) 0;
+            }
+
+            /* File upload area */
+            .file-upload {
+                padding: var(--spacing-lg);
+            }
+
+            .upload-icon {
+                font-size: var(--font-2xl);
+            }
+
+            /* Verification container */
+            .verification-container {
+                padding: var(--spacing-lg) var(--spacing-sm);
+            }
+
+            .verification-step {
+                padding: var(--spacing-md);
+            }
+
+            /* Webcam */
+            #webcam-video {
+                max-width: 100%;
+            }
+
+            /* Profile popup mobile */
+            .profile-popup {
+                padding: var(--spacing-sm);
+            }
+
+            .profile-content {
+                width: 100%;
+                max-width: 100%;
+                padding: var(--spacing-lg);
+                max-height: 90vh;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .profile-close {
+                font-size: var(--font-xl);
+                padding: var(--spacing-sm);
+                min-width: var(--touch-target-min);
+                min-height: var(--touch-target-min);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .profile-row {
+                font-size: var(--font-xs);
+                flex-wrap: wrap;
+                gap: var(--spacing-xs);
+            }
+
+            .badges-container {
+                margin: var(--spacing-sm) 0;
+            }
+
+            .badge {
+                font-size: 9px;
+                padding: 3px 6px;
+            }
+
+            /* Chart containers */
+            .chart-container {
+                min-height: 200px;
+                overflow-x: auto;
+            }
+
+            .ascii-chart {
+                font-size: 8px;
+            }
         }
     </style>
 </head>
