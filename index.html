@@ -7,6 +7,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.0/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <!-- LiveKit Client SDK for real-time audio -->
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.6.1/dist/livekit-client.umd.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
 
@@ -977,6 +979,711 @@
                 padding: var(--spacing-sm);
                 margin-bottom: var(--spacing-sm);
             }
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 255, 65, 0.95);
+            color: #0a0a0a;
+            padding: 12px 24px;
+            border: 2px solid #00ff41;
+            font-weight: bold;
+            z-index: 2000;
+            animation: toastIn 0.3s ease;
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        /* Invite Modal */
+        .invite-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #004d15;
+        }
+
+        .invite-code {
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid #00ff41;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .invite-code:hover {
+            background: rgba(0, 255, 65, 0.2);
+        }
+
+        .invite-stats {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 11px;
+        }
+
+        .referral-badge {
+            display: inline-block;
+            background: rgba(0, 255, 65, 0.2);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            padding: 2px 8px;
+            margin: 2px;
+            font-size: 10px;
+        }
+
+        /* Net Room Styles */
+        .net-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .net-popup.show {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Mini player for minimized net */
+        .net-mini-player {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 320px;
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid #00ff41;
+            border-radius: 8px;
+            z-index: 999;
+            display: none;
+            flex-direction: column;
+            box-shadow: 0 4px 20px rgba(0, 255, 65, 0.3);
+        }
+
+        .net-mini-player.show {
+            display: flex;
+        }
+
+        .mini-player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            background: rgba(0, 255, 65, 0.1);
+            border-bottom: 1px solid #00ff41;
+            cursor: pointer;
+        }
+
+        .mini-player-title {
+            font-size: 11px;
+            font-weight: bold;
+            color: #00ff41;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mini-player-live {
+            background: #ff0000;
+            color: #fff;
+            padding: 1px 5px;
+            font-size: 8px;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+
+        .mini-player-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .mini-player-btn {
+            background: transparent;
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mini-player-btn:hover {
+            background: rgba(0, 255, 65, 0.2);
+        }
+
+        .mini-player-btn.danger {
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+
+        .mini-player-body {
+            padding: 10px 12px;
+        }
+
+        .mini-player-speakers {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .mini-speaker {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            padding: 3px 8px;
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid #004d15;
+        }
+
+        .mini-speaker.speaking {
+            border-color: #00ff41;
+            box-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
+        }
+
+        .mini-player-stats {
+            font-size: 9px;
+            color: #666;
+        }
+
+        .mini-player-mute {
+            width: 100%;
+            padding: 8px;
+            margin-top: 8px;
+            background: transparent;
+            border: 1px solid;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .mini-player-mute.muted {
+            border-color: #00ff41;
+            color: #00ff41;
+        }
+
+        .mini-player-mute.unmuted {
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+
+        .net-header {
+            border-bottom: 2px solid #00ff41;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 255, 65, 0.05);
+        }
+
+        .net-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #00ff41;
+        }
+
+        .net-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .net-live-badge {
+            background: #ff0000;
+            color: #fff;
+            padding: 2px 8px;
+            font-size: 10px;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .net-body {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .net-stage {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .speakers-section {
+            margin-bottom: 20px;
+        }
+
+        .speakers-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .speaker-card {
+            border: 1px solid #00ff41;
+            padding: 15px;
+            text-align: center;
+            min-width: 100px;
+            background: rgba(0, 255, 65, 0.05);
+            position: relative;
+        }
+
+        .speaker-card.host {
+            border-color: #ffaa00;
+            background: rgba(255, 170, 0, 0.1);
+        }
+
+        .speaker-card.co-host {
+            border-color: #00aaff;
+            background: rgba(0, 170, 255, 0.1);
+        }
+
+        .speaker-card.speaking {
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.5);
+            animation: speaking 1s infinite;
+        }
+
+        @keyframes speaking {
+            0%, 100% { box-shadow: 0 0 10px rgba(0, 255, 65, 0.3); }
+            50% { box-shadow: 0 0 20px rgba(0, 255, 65, 0.6); }
+        }
+
+        .speaker-avatar {
+            width: 50px;
+            height: 50px;
+            border: 2px solid #00ff41;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 8px;
+            font-size: 20px;
+        }
+
+        .speaker-name {
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .speaker-role {
+            font-size: 9px;
+            color: #888;
+        }
+
+        .speaker-muted {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            color: #ff0000;
+            font-size: 12px;
+        }
+
+        .listeners-section {
+            border-top: 1px solid #004d15;
+            padding-top: 15px;
+            flex: 1;
+        }
+
+        .listeners-count {
+            color: #888;
+            font-size: 11px;
+            margin-bottom: 10px;
+        }
+
+        .listeners-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .listener-badge {
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid #004d15;
+            padding: 4px 10px;
+            font-size: 10px;
+        }
+
+        .net-sidebar {
+            border-left: 1px solid #00ff41;
+            display: flex;
+            flex-direction: column;
+            background: rgba(0, 255, 65, 0.02);
+        }
+
+        .net-chat-header {
+            padding: 10px 15px;
+            border-bottom: 1px solid #004d15;
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        .net-chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 15px;
+            font-size: 10px;
+        }
+
+        .net-chat-input {
+            padding: 10px 15px;
+            border-top: 1px solid #004d15;
+            display: flex;
+            gap: 8px;
+        }
+
+        .net-chat-input input {
+            flex: 1;
+            background: transparent;
+            border: 1px solid #004d15;
+            color: #00ff41;
+            padding: 8px;
+            font-family: inherit;
+            font-size: 10px;
+        }
+
+        .net-chat-input button {
+            background: transparent;
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 10px;
+        }
+
+        .net-controls {
+            padding: 15px 20px;
+            border-top: 1px solid #00ff41;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            background: rgba(0, 255, 65, 0.02);
+        }
+
+        .net-control-btn {
+            background: transparent;
+            border: 2px solid #00ff41;
+            color: #00ff41;
+            padding: 12px 20px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .net-control-btn:hover {
+            background: rgba(0, 255, 65, 0.1);
+        }
+
+        .net-control-btn.danger {
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+
+        .net-control-btn.danger:hover {
+            background: rgba(255, 0, 0, 0.1);
+        }
+
+        .net-control-btn.request {
+            border-color: #ffaa00;
+            color: #ffaa00;
+        }
+
+        .net-control-btn.request:hover {
+            background: rgba(255, 170, 0, 0.1);
+        }
+
+        .net-control-btn.mute {
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+
+        .net-control-btn.unmute {
+            border-color: #00ff41;
+            color: #00ff41;
+        }
+
+        .requests-panel {
+            border: 1px solid #ffaa00;
+            padding: 15px;
+            margin-top: 15px;
+            background: rgba(255, 170, 0, 0.05);
+        }
+
+        .request-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px dotted #004d15;
+        }
+
+        .request-item:last-child {
+            border-bottom: none;
+        }
+
+        .request-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .request-btn {
+            background: transparent;
+            border: 1px solid;
+            padding: 4px 10px;
+            font-size: 9px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .request-btn.approve {
+            border-color: #00ff41;
+            color: #00ff41;
+        }
+
+        .request-btn.deny {
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+
+        /* Create Net Modal */
+        .create-net-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1001;
+        }
+
+        .create-net-modal.show {
+            display: flex;
+        }
+
+        .create-net-content {
+            border: 2px solid #00ff41;
+            background: #0a0a0a;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        /* Nets listing styles */
+        .nets-list {
+            border: 1px solid #00ff41;
+            padding: 15px;
+            background: rgba(0, 255, 65, 0.02);
+        }
+
+        .net-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px dotted #004d15;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .net-item:hover {
+            background: rgba(0, 255, 65, 0.05);
+            padding-left: 15px;
+        }
+
+        .net-item:last-child {
+            border-bottom: none;
+        }
+
+        .net-item-live {
+            color: #ff0000;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .net-item-info {
+            flex: 1;
+        }
+
+        .net-item-name {
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .net-item-host {
+            font-size: 10px;
+            color: #888;
+        }
+
+        .net-item-stats {
+            text-align: right;
+            font-size: 10px;
+            color: #888;
+        }
+
+        .net-item-count {
+            font-weight: bold;
+            color: #00ff41;
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            body {
+                font-size: 11px;
+                overflow-x: hidden;
+            }
+
+            .auth-box {
+                padding: 20px;
+                margin: 10px;
+            }
+
+            .auth-logo {
+                font-size: 24px;
+            }
+
+            .terminal-container {
+                padding: 10px;
+            }
+
+            .terminal-header {
+                padding: 8px;
+            }
+
+            .header-line {
+                flex-wrap: wrap;
+                gap: 5px;
+                font-size: 9px;
+            }
+
+            .header-line span {
+                flex: 1 1 auto;
+            }
+
+            /* Stack main grid on mobile */
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            /* Stack treasury grid on mobile */
+            .treasury-grid {
+                grid-template-columns: 1fr;
+            }
+
+            /* Horizontal scroll for tables */
+            .members-table {
+                overflow-x: auto;
+            }
+
+            .table-row {
+                grid-template-columns: 40px 120px 80px 60px 50px;
+                font-size: 10px;
+                min-width: 350px;
+            }
+
+            /* Navigation tabs - scrollable */
+            .nav-tabs {
+                overflow-x: auto;
+                gap: 10px;
+                padding-bottom: 15px;
+                flex-wrap: nowrap;
+            }
+
+            .nav-tab {
+                padding: 8px 12px;
+                font-size: 10px;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+
+            /* Chat terminal - stack on mobile */
+            .chat-terminal {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .chat-list {
+                max-height: 150px;
+                overflow-y: auto;
+            }
+
+            .chat-window {
+                height: 350px;
+            }
+
+            .chat-messages {
+                font-size: 10px;
+            }
+
+            /* Vote items */
+            .vote-bar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+
+            .progress-bar {
+                width: 100%;
+            }
+
+            .vote-title {
+                font-size: 11px;
+            }
+
+            /* Profile popup */
+            .profile-content {
+                padding: 15px;
+                max-height: 90vh;
+                overflow-y: auto;
+            }
+
+            .profile-row {
+                flex-direction: column;
+                gap: 2px;
+            }
+
+            .profile-row .stat-label {
+                font-size: 9px;
+            }
+
+            /* ASCII chart - smaller font */
+            .ascii-chart {
+                font-size: 7px;
+                overflow-x: auto;
+            }
+
+            .chart-container {
+                min-height: auto;
+                overflow-x: auto;
+            }
 
             /* Big numbers smaller on mobile */
             .big-number {
@@ -1058,7 +1765,107 @@
             }
 
             .ascii-chart {
+                font-size: 18px;
+            }
+
+            /* System info repositioned */
+            .system-info {
                 font-size: 8px;
+                bottom: 5px;
+                right: 5px;
+                left: 5px;
+                text-align: center;
+            }
+
+            /* Verification steps */
+            .verification-step {
+                padding: 15px;
+            }
+
+            .step-title {
+                font-size: 14px;
+            }
+
+            .file-upload {
+                padding: 20px;
+            }
+
+            .upload-icon {
+                font-size: 32px;
+            }
+
+            /* Stages */
+            .live-stages {
+                font-size: 11px;
+            }
+
+            .stage-item {
+                padding: 10px 0;
+            }
+
+            /* Net popup mobile */
+            .net-body {
+                grid-template-columns: 1fr;
+            }
+
+            .net-sidebar {
+                border-left: none;
+                border-top: 1px solid #00ff41;
+                max-height: 200px;
+            }
+
+            .net-controls {
+                flex-wrap: wrap;
+            }
+
+            .net-control-btn {
+                padding: 10px 15px;
+                font-size: 10px;
+            }
+
+            .speaker-card {
+                min-width: 80px;
+                padding: 10px;
+            }
+
+            .speaker-avatar {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+            }
+
+            .speaker-name {
+                font-size: 9px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .auth-logo {
+                font-size: 20px;
+            }
+
+            .nav-tabs {
+                gap: 5px;
+            }
+
+            .nav-tab {
+                padding: 6px 8px;
+                font-size: 9px;
+            }
+
+            .table-row {
+                grid-template-columns: 35px 100px 70px 50px 40px;
+                font-size: 9px;
+            }
+
+            .ascii-chart {
+                display: none;
+            }
+
+            .chart-container::after {
+                content: '[Chart optimized for desktop view]';
+                color: #666;
+                font-size: 10px;
             }
         }
     </style>
@@ -1310,6 +2117,7 @@
             <button class="nav-tab" onclick="showSection('treasury')">TREASURY</button>
             <button class="nav-tab" onclick="showSection('members')">MEMBERS</button>
             <button class="nav-tab" onclick="showSection('votes')">VOTES</button>
+            <button class="nav-tab" onclick="showSection('nets')">NETS</button>
             <button class="nav-tab" onclick="showSection('comms')">COMMS</button>
             <button class="nav-tab" style="margin-left: auto; border-color: #ff0000; color: #ff0000;" onclick="logout()">LOGOUT</button>
         </div>
@@ -1685,6 +2493,42 @@ AUG  $24.9M  ██████████████████████�
             </div>
         </div>
 
+        <!-- Nets Section (Audio Rooms) -->
+        <div id="nets" class="section">
+            <div class="main-grid">
+                <div class="nets-list">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <span style="font-weight: bold; color: #00ff41;">LIVE_NETS</span>
+                        <button class="btn-primary" style="width: auto; padding: 8px 15px;" onclick="showCreateNetModal()">+ CREATE_NET</button>
+                    </div>
+                    <div id="nets-container">
+                        <!-- Nets will be loaded here -->
+                        <div style="text-align: center; color: #666; padding: 20px;">Loading nets...</div>
+                    </div>
+                </div>
+
+                <div class="live-stages" style="border: 1px solid #00ff41;">
+                    <div style="font-weight: bold; margin-bottom: 15px; color: #00ff41;">QUICK_ACTIONS</div>
+                    <div style="margin-bottom: 15px;">
+                        <button class="btn-primary" style="margin-bottom: 10px;" onclick="showCreateNetModal()">START_MY_NET</button>
+                        <div style="font-size: 10px; color: #666;">
+                            Create your own audio room where you're the host. Invite others to speak or let them listen.
+                        </div>
+                    </div>
+                    <div style="border-top: 1px dotted #004d15; padding-top: 15px;">
+                        <div style="font-weight: bold; margin-bottom: 10px; color: #ffaa00;">NET_COMMANDS:</div>
+                        <div style="font-size: 10px; color: #666;">
+                            >> CREATE_NET [NAME]<br/>
+                            >> JOIN_NET [NET_ID]<br/>
+                            >> LEAVE_NET<br/>
+                            >> REQUEST_MIC<br/>
+                            >> END_NET
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Communications Section -->
         <div id="comms" class="section">
             <div class="chat-terminal">
@@ -1871,7 +2715,159 @@ AUG  $24.9M  ██████████████████████�
                     LAST_BACKGROUND_CHECK: 15MAR24<br/>
                     NEXT_VERIFICATION: 15MAR25
                 </div>
+
+                <!-- Referral Section -->
+                <div class="invite-section" id="referral-section">
+                    <div style="font-weight: bold; margin-bottom: 10px; color: #00ff41;">REFERRAL_NETWORK</div>
+
+                    <!-- Who referred you -->
+                    <div id="referred-by-section" class="hidden">
+                        <div class="profile-row">
+                            <span class="stat-label">RECRUITED_BY:</span>
+                            <span class="stat-value" id="referred-by-name">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Your referral stats -->
+                    <div class="invite-stats">
+                        <span>INVITES_THIS_WEEK: <span id="invites-remaining">5</span>/5</span>
+                        <span>TOTAL_RECRUITS: <span id="total-referrals">0</span></span>
+                    </div>
+
+                    <!-- Generate invite button -->
+                    <button class="btn-primary" style="margin: 10px 0;" onclick="generateInvite()">
+                        GENERATE_INVITE_CODE
+                    </button>
+
+                    <!-- Active invite code display -->
+                    <div id="invite-code-display" class="hidden">
+                        <div class="invite-code" onclick="copyInviteCode()">
+                            <span id="current-invite-code">VET-XXXXXX</span>
+                            <div style="font-size: 9px; color: #888; margin-top: 5px;">TAP TO COPY</div>
+                        </div>
+                        <div style="text-align: center; margin-top: 5px;">
+                            <button class="btn-secondary" style="width: auto; padding: 8px 15px;" onclick="shareInvite()">
+                                SHARE_INVITE
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Your recruits list -->
+                    <div id="referrals-list" class="hidden" style="margin-top: 15px;">
+                        <div style="font-size: 10px; color: #888; margin-bottom: 5px;">YOUR_RECRUITS:</div>
+                        <div id="referrals-container"></div>
+                    </div>
+                </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Net Room Popup -->
+    <div class="net-popup" id="net-popup">
+        <div class="net-header">
+            <div>
+                <div class="net-title" id="net-room-name">NET_NAME</div>
+                <div style="font-size: 10px; color: #888;" id="net-room-host">Hosted by: HOST_NAME</div>
+            </div>
+            <div class="net-status">
+                <span class="net-live-badge">LIVE</span>
+                <button class="mini-player-btn" onclick="minimizeNet()" title="Minimize">−</button>
+                <button class="profile-close" onclick="closeNetRoom()">×</button>
+            </div>
+        </div>
+
+        <div class="net-body">
+            <div class="net-stage">
+                <div class="speakers-section">
+                    <div style="font-weight: bold; margin-bottom: 10px;">SPEAKERS</div>
+                    <div class="speakers-grid" id="speakers-grid">
+                        <!-- Speakers will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Speak requests panel (only for hosts) -->
+                <div class="requests-panel hidden" id="requests-panel">
+                    <div style="font-weight: bold; margin-bottom: 10px; color: #ffaa00;">SPEAK_REQUESTS</div>
+                    <div id="requests-list">
+                        <!-- Requests will be loaded here -->
+                    </div>
+                </div>
+
+                <div class="listeners-section">
+                    <div class="listeners-count" id="listeners-count">LISTENERS: 0</div>
+                    <div class="listeners-list" id="listeners-list">
+                        <!-- Listeners will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="net-sidebar">
+                <div class="net-chat-header">LIVE_CHAT</div>
+                <div class="net-chat-messages" id="net-chat-messages">
+                    <!-- Chat messages will be loaded here -->
+                </div>
+                <div class="net-chat-input">
+                    <input type="text" id="net-chat-input" placeholder="Type message..." />
+                    <button onclick="sendNetMessage()">SEND</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="net-controls" id="net-controls">
+            <!-- Controls will be dynamically added based on user role -->
+        </div>
+    </div>
+
+    <!-- Create Net Modal -->
+    <div class="create-net-modal" id="create-net-modal" onclick="closeCreateNetModal(event)">
+        <div class="create-net-content" onclick="event.stopPropagation()">
+            <div style="font-size: 16px; font-weight: bold; margin-bottom: 20px; color: #00ff41;">CREATE_NEW_NET</div>
+
+            <div class="form-group">
+                <label class="form-label">NET_NAME:</label>
+                <input type="text" class="form-input" id="new-net-name" placeholder="e.g., FRIDAY_DEBRIEF" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">DESCRIPTION (optional):</label>
+                <input type="text" class="form-input" id="new-net-description" placeholder="What's this net about?" />
+            </div>
+
+            <div style="margin: 20px 0; padding: 15px; border: 1px solid #004d15; font-size: 10px; color: #888;">
+                <div style="color: #ffaa00; margin-bottom: 8px;">AS_HOST_YOU_CAN:</div>
+                • Speak to all listeners<br/>
+                • Invite co-hosts<br/>
+                • Approve/deny speak requests<br/>
+                • End the net at any time
+            </div>
+
+            <button class="btn-primary" onclick="createNet()">GO_LIVE</button>
+            <button class="btn-secondary" onclick="closeCreateNetModal()">CANCEL</button>
+        </div>
+    </div>
+
+    <!-- Net Mini Player (minimized view) -->
+    <div class="net-mini-player" id="net-mini-player">
+        <div class="mini-player-header" onclick="expandNet()">
+            <div class="mini-player-title">
+                <span class="mini-player-live">LIVE</span>
+                <span id="mini-player-name">NET_NAME</span>
+            </div>
+            <div class="mini-player-controls">
+                <button class="mini-player-btn" onclick="event.stopPropagation(); expandNet()" title="Expand">⤢</button>
+                <button class="mini-player-btn danger" onclick="event.stopPropagation(); leaveNet()" title="Leave">×</button>
+            </div>
+        </div>
+        <div class="mini-player-body">
+            <div class="mini-player-speakers" id="mini-player-speakers">
+                <!-- Speakers will be shown here -->
+            </div>
+            <div class="mini-player-stats" id="mini-player-stats">
+                0 speakers · 0 listeners
+            </div>
+            <button class="mini-player-mute muted" id="mini-player-mute" onclick="toggleMute()">
+                🎤 UNMUTE
+            </button>
         </div>
     </div>
 
@@ -1937,6 +2933,13 @@ AUG  $24.9M  ██████████████████████�
 
                     if (result.success) {
                         currentUser = result.user;
+
+                        // Save session to localStorage for persistence
+                        localStorage.setItem('vetnet_session', JSON.stringify({
+                            userId: currentUser.id,
+                            username: currentUser.username
+                        }));
+
                         document.getElementById('auth-screen').classList.add('hidden');
                         document.getElementById('main-app').classList.add('active');
                         document.getElementById('current-user').textContent = currentUser.username;
@@ -1952,6 +2955,37 @@ AUG  $24.9M  ██████████████████████�
                 alert('Please enter username and password');
             }
         }
+
+        // Check for saved session on page load
+        async function checkSavedSession() {
+            const saved = localStorage.getItem('vetnet_session');
+            if (saved) {
+                try {
+                    const session = JSON.parse(saved);
+                    // Re-authenticate with saved username
+                    const result = await api('/api/auth/login', {
+                        method: 'POST',
+                        body: JSON.stringify({ username: session.username, password: 'auto' })
+                    });
+
+                    if (result.success) {
+                        currentUser = result.user;
+                        document.getElementById('auth-screen').classList.add('hidden');
+                        document.getElementById('main-app').classList.add('active');
+                        document.getElementById('current-user').textContent = currentUser.username;
+                        await loadAllData();
+                        return true;
+                    }
+                } catch (err) {
+                    console.error('Session restore failed:', err);
+                    localStorage.removeItem('vetnet_session');
+                }
+            }
+            return false;
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', checkSavedSession);
 
         async function startVerification() {
             const email = document.getElementById('signup-email').value;
@@ -1977,6 +3011,10 @@ AUG  $24.9M  ██████████████████████�
                     });
                 }
                 currentUser = null;
+
+                // Clear saved session
+                localStorage.removeItem('vetnet_session');
+
                 document.getElementById('main-app').classList.remove('active');
                 document.getElementById('auth-screen').classList.remove('hidden');
                 document.getElementById('login-username').value = '';
@@ -1993,7 +3031,8 @@ AUG  $24.9M  ██████████████████████�
                 loadMembers(),
                 loadProposals(),
                 loadChannels(),
-                loadStages(),
+                loadNets(),
+                loadNetsInOverview(),
                 loadUserProfile()
             ]);
         }
@@ -2330,39 +3369,6 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
             }
         }
 
-        // Load stages
-        async function loadStages() {
-            const stages = await api('/api/stages');
-            const stagesContainer = document.querySelector('.live-stages');
-
-            stagesContainer.innerHTML = '<div style="font-weight: bold; margin-bottom: 15px; color: #00ff41;">LIVE_VOICE_CHANNELS</div>';
-
-            stages.forEach(stage => {
-                const stageItem = document.createElement('div');
-                stageItem.className = 'stage-item';
-                stageItem.onclick = () => joinStage(stage.id, stage.name);
-                stageItem.innerHTML = `
-                    <span ${stage.is_live ? 'class="live-indicator"' : 'style="margin-right: 10px; color: #666;"'}>${stage.is_live ? '●' : '○'}</span>
-                    <span ${!stage.is_live ? 'style="color: #888;"' : ''}>${stage.name}</span>
-                    <span class="stage-listeners" ${!stage.is_live ? 'style="color: #666;"' : ''}>${stage.listener_count || '--'}</span>
-                `;
-                stagesContainer.appendChild(stageItem);
-            });
-
-            stagesContainer.innerHTML += `
-                <div style="margin-top: 15px; font-size: 10px; color: #666;">
-                    >> JOIN_STAGE [STAGE_NAME]<br/>
-                    >> CREATE_STAGE --private
-                </div>
-            `;
-        }
-
-        async function joinStage(stageId, stageName) {
-            await api(`/api/stages/${stageId}/join`, { method: 'POST' });
-            alert(`Joining voice stage: ${stageName}\n\nThis would connect you to the live voice channel.`);
-            await loadStages();
-        }
-
         // Load user profile
         async function loadUserProfile() {
             if (!currentUser) return;
@@ -2392,7 +3398,908 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                     `<div class="badge">${badge}</div>`
                 ).join('');
             }
+
+            // Load referral data
+            await loadReferralData();
         }
+
+        // ============ REFERRAL SYSTEM ============
+
+        let currentInviteCode = null;
+
+        // Toast notification helper
+        function showToast(message) {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Load referral data for current user
+        async function loadReferralData() {
+            if (!currentUser) return;
+
+            try {
+                // Get invite stats
+                const inviteData = await api(`/api/invites/${currentUser.id}`);
+                document.getElementById('invites-remaining').textContent = inviteData.weeklyInvitesRemaining;
+                document.getElementById('total-referrals').textContent = inviteData.totalReferrals;
+
+                // Check if user was referred by someone
+                const referrerData = await api(`/api/users/${currentUser.id}/referrer`);
+                if (referrerData.referrer) {
+                    document.getElementById('referred-by-section').classList.remove('hidden');
+                    document.getElementById('referred-by-name').textContent = referrerData.referrer.username;
+                }
+
+                // Load list of people this user has referred
+                const referralsData = await api(`/api/users/${currentUser.id}/referrals`);
+                if (referralsData.count > 0) {
+                    document.getElementById('referrals-list').classList.remove('hidden');
+                    const container = document.getElementById('referrals-container');
+                    container.innerHTML = referralsData.referrals.map(r =>
+                        `<div class="referral-badge">${r.username}</div>`
+                    ).join('');
+                }
+
+                // Show most recent unused invite if exists
+                const unusedInvite = inviteData.invites.find(i => !i.used_by);
+                if (unusedInvite) {
+                    currentInviteCode = unusedInvite.code;
+                    document.getElementById('current-invite-code').textContent = unusedInvite.code;
+                    document.getElementById('invite-code-display').classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error('Error loading referral data:', err);
+            }
+        }
+
+        // Generate a new invite code
+        async function generateInvite() {
+            if (!currentUser) return;
+
+            try {
+                const result = await api('/api/invites', {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id })
+                });
+
+                if (result.error) {
+                    showToast(result.error);
+                    return;
+                }
+
+                currentInviteCode = result.invite.code;
+                document.getElementById('current-invite-code').textContent = result.invite.code;
+                document.getElementById('invite-code-display').classList.remove('hidden');
+                document.getElementById('invites-remaining').textContent = result.remaining;
+
+                showToast('INVITE_CODE_GENERATED!');
+            } catch (err) {
+                showToast('ERROR_GENERATING_INVITE');
+            }
+        }
+
+        // Copy invite code to clipboard
+        async function copyInviteCode() {
+            if (!currentInviteCode) return;
+
+            try {
+                await navigator.clipboard.writeText(currentInviteCode);
+                showToast('CODE_COPIED: ' + currentInviteCode);
+            } catch (err) {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = currentInviteCode;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showToast('CODE_COPIED: ' + currentInviteCode);
+            }
+        }
+
+        // Share invite via native share or copy link
+        async function shareInvite() {
+            if (!currentInviteCode) return;
+
+            const shareText = `Join VETNET - the credentialed veterans network. Use my invite code: ${currentInviteCode}`;
+            const shareUrl = window.location.origin + '?invite=' + currentInviteCode;
+
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'VETNET Invite',
+                        text: shareText,
+                        url: shareUrl
+                    });
+                    showToast('INVITE_SHARED!');
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        copyInviteCode();
+                    }
+                }
+            } else {
+                // Fallback: copy to clipboard
+                try {
+                    await navigator.clipboard.writeText(shareText + '\n' + shareUrl);
+                    showToast('INVITE_LINK_COPIED!');
+                } catch (err) {
+                    copyInviteCode();
+                }
+            }
+        }
+
+        // Check for invite code in URL on page load
+        function checkInviteCode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const inviteCode = urlParams.get('invite');
+            if (inviteCode) {
+                // Store for use during signup
+                sessionStorage.setItem('pendingInviteCode', inviteCode);
+                showToast('INVITE_CODE_DETECTED: ' + inviteCode);
+            }
+        }
+
+        // Call on page load
+        document.addEventListener('DOMContentLoaded', checkInviteCode);
+
+        // ============ NETS (AUDIO ROOMS) SYSTEM ============
+
+        let currentNetId = null;
+        let currentNetData = null;
+        let netRefreshInterval = null;
+        let netChatRefreshInterval = null;
+
+        // LiveKit audio state
+        let livekitRoom = null;
+        let livekitEnabled = false;
+        let localAudioTrack = null;
+        let livekitUrl = '';
+
+        // Check if LiveKit is configured on server
+        async function checkLivekitConfig() {
+            try {
+                const config = await api('/api/livekit/config');
+                livekitEnabled = config.enabled;
+                livekitUrl = config.url;
+                console.log('LiveKit enabled:', livekitEnabled);
+            } catch (err) {
+                console.log('LiveKit not available');
+                livekitEnabled = false;
+            }
+        }
+
+        // Initialize LiveKit check on page load
+        document.addEventListener('DOMContentLoaded', checkLivekitConfig);
+
+        // Connect to LiveKit room
+        async function connectToLiveKitRoom(netId) {
+            if (!livekitEnabled || !window.LivekitClient) {
+                console.log('LiveKit not available, using simulation mode');
+                return false;
+            }
+
+            try {
+                // Get token from server
+                const tokenData = await api(`/api/nets/${netId}/token`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id })
+                });
+
+                if (tokenData.error) {
+                    console.log('Token error:', tokenData.message);
+                    return false;
+                }
+
+                // Create and connect to room
+                livekitRoom = new LivekitClient.Room({
+                    adaptiveStream: true,
+                    dynacast: true,
+                    audioCaptureDefaults: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+
+                // Set up event listeners
+                livekitRoom.on(LivekitClient.RoomEvent.TrackSubscribed, handleTrackSubscribed);
+                livekitRoom.on(LivekitClient.RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+                livekitRoom.on(LivekitClient.RoomEvent.ParticipantConnected, handleParticipantConnected);
+                livekitRoom.on(LivekitClient.RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
+                livekitRoom.on(LivekitClient.RoomEvent.Disconnected, handleRoomDisconnected);
+                livekitRoom.on(LivekitClient.RoomEvent.ActiveSpeakersChanged, handleActiveSpeakers);
+
+                // Connect
+                await livekitRoom.connect(tokenData.url, tokenData.token);
+                console.log('Connected to LiveKit room:', tokenData.room);
+
+                // If we can publish (speaker/host), enable mic
+                if (tokenData.canPublish) {
+                    await enableLocalAudio();
+                }
+
+                showToast('AUDIO_CONNECTED');
+                return true;
+            } catch (err) {
+                console.error('LiveKit connection error:', err);
+                showToast('Audio connection failed - using text only');
+                return false;
+            }
+        }
+
+        // Enable local audio (microphone)
+        async function enableLocalAudio() {
+            if (!livekitRoom) return;
+
+            try {
+                localAudioTrack = await LivekitClient.createLocalAudioTrack({
+                    echoCancellation: true,
+                    noiseSuppression: true
+                });
+                await livekitRoom.localParticipant.publishTrack(localAudioTrack);
+                console.log('Microphone enabled');
+            } catch (err) {
+                console.error('Error enabling microphone:', err);
+                showToast('MICROPHONE_ERROR: Check permissions');
+            }
+        }
+
+        // Disable local audio
+        async function disableLocalAudio() {
+            if (localAudioTrack) {
+                await livekitRoom?.localParticipant.unpublishTrack(localAudioTrack);
+                localAudioTrack.stop();
+                localAudioTrack = null;
+            }
+        }
+
+        // Handle incoming audio tracks
+        function handleTrackSubscribed(track, publication, participant) {
+            if (track.kind === 'audio') {
+                const audioElement = track.attach();
+                audioElement.id = `audio-${participant.identity}`;
+                document.body.appendChild(audioElement);
+                console.log('Audio track subscribed:', participant.identity);
+            }
+        }
+
+        // Handle track unsubscribe
+        function handleTrackUnsubscribed(track, publication, participant) {
+            if (track.kind === 'audio') {
+                track.detach().forEach(el => el.remove());
+                const audioEl = document.getElementById(`audio-${participant.identity}`);
+                if (audioEl) audioEl.remove();
+            }
+        }
+
+        // Handle new participant
+        function handleParticipantConnected(participant) {
+            console.log('Participant joined:', participant.identity);
+        }
+
+        // Handle participant leaving
+        function handleParticipantDisconnected(participant) {
+            console.log('Participant left:', participant.identity);
+            const audioEl = document.getElementById(`audio-${participant.identity}`);
+            if (audioEl) audioEl.remove();
+        }
+
+        // Handle room disconnect
+        function handleRoomDisconnected() {
+            console.log('Disconnected from LiveKit room');
+            cleanupLiveKit();
+        }
+
+        // Handle active speakers (visual indicator)
+        function handleActiveSpeakers(speakers) {
+            // Update UI to show who's speaking
+            document.querySelectorAll('.speaker-card').forEach(card => {
+                card.classList.remove('speaking');
+            });
+
+            speakers.forEach(speaker => {
+                const speakerCards = document.querySelectorAll('.speaker-card');
+                speakerCards.forEach(card => {
+                    if (card.querySelector('.speaker-name')?.textContent === speaker.identity) {
+                        card.classList.add('speaking');
+                    }
+                });
+            });
+        }
+
+        // Cleanup LiveKit connection
+        function cleanupLiveKit() {
+            if (localAudioTrack) {
+                localAudioTrack.stop();
+                localAudioTrack = null;
+            }
+            if (livekitRoom) {
+                livekitRoom.disconnect();
+                livekitRoom = null;
+            }
+            // Remove all audio elements
+            document.querySelectorAll('[id^="audio-"]').forEach(el => el.remove());
+        }
+
+        // Refresh token when role changes (approved to speak)
+        // Need to reconnect to LiveKit with new permissions
+        async function refreshLiveKitToken() {
+            if (!livekitEnabled || !currentNetId) return;
+
+            try {
+                const tokenData = await api(`/api/nets/${currentNetId}/refresh-token`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id })
+                });
+
+                if (tokenData.canPublish && !localAudioTrack) {
+                    // Need to disconnect and reconnect with new token for publish permissions
+                    if (livekitRoom) {
+                        console.log('Reconnecting to LiveKit with speaker permissions...');
+
+                        // Disconnect current session
+                        await livekitRoom.disconnect();
+
+                        // Reconnect with new token that has publish permissions
+                        await livekitRoom.connect(tokenData.url || livekitUrl, tokenData.token);
+
+                        // Now enable local audio
+                        await enableLocalAudio();
+                        showToast('MIC_ENABLED - You can now speak!');
+                    }
+                }
+            } catch (err) {
+                console.error('Error refreshing token:', err);
+                showToast('Error enabling microphone');
+            }
+        }
+
+        // Load all live nets
+        async function loadNets() {
+            try {
+                const nets = await api('/api/nets?status=live');
+                const container = document.getElementById('nets-container');
+
+                if (nets.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align: center; color: #666; padding: 30px;">
+                            <div style="font-size: 24px; margin-bottom: 10px;">📻</div>
+                            <div>No live nets right now</div>
+                            <div style="font-size: 10px; margin-top: 5px;">Be the first to start one!</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = nets.map(net => `
+                    <div class="net-item" onclick="joinNet(${net.id})">
+                        <span class="net-item-live">●</span>
+                        <div class="net-item-info">
+                            <div class="net-item-name">${net.name}</div>
+                            <div class="net-item-host">Host: ${net.host_username}</div>
+                        </div>
+                        <div class="net-item-stats">
+                            <div class="net-item-count">${net.participant_count}</div>
+                            <div>listening</div>
+                            <div style="margin-top: 5px;">${net.speaker_count} speakers</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Error loading nets:', err);
+            }
+        }
+
+        // Also update the overview stages section to show nets
+        async function loadNetsInOverview() {
+            try {
+                const nets = await api('/api/nets?status=live');
+                const stagesContainer = document.querySelector('.live-stages');
+
+                if (!stagesContainer) return;
+
+                // Clear and rebuild (avoid innerHTML += which destroys event handlers)
+                stagesContainer.innerHTML = '';
+
+                const header = document.createElement('div');
+                header.style.cssText = 'font-weight: bold; margin-bottom: 15px; color: #00ff41;';
+                header.textContent = 'LIVE_NETS';
+                stagesContainer.appendChild(header);
+
+                if (nets.length === 0) {
+                    const emptyMsg = document.createElement('div');
+                    emptyMsg.style.cssText = 'text-align: center; color: #666; padding: 20px;';
+                    emptyMsg.innerHTML = '<div>No live nets</div>';
+                    stagesContainer.appendChild(emptyMsg);
+                } else {
+                    nets.slice(0, 4).forEach(net => {
+                        const stageItem = document.createElement('div');
+                        stageItem.className = 'stage-item';
+                        stageItem.style.cursor = 'pointer';
+                        stageItem.onclick = () => joinNet(net.id);
+                        stageItem.innerHTML = `
+                            <span class="live-indicator">●</span>
+                            <span>${net.name}</span>
+                            <span class="stage-listeners">${net.participant_count}</span>
+                        `;
+                        stagesContainer.appendChild(stageItem);
+                    });
+                }
+
+                // Add button as DOM element to preserve event handlers
+                const buttonContainer = document.createElement('div');
+                buttonContainer.style.marginTop = '15px';
+                const startButton = document.createElement('button');
+                startButton.className = 'btn-primary';
+                startButton.style.cssText = 'font-size: 10px; padding: 8px;';
+                startButton.textContent = '+ START_NET';
+                startButton.onclick = showCreateNetModal;
+                buttonContainer.appendChild(startButton);
+                stagesContainer.appendChild(buttonContainer);
+            } catch (err) {
+                console.error('Error loading nets in overview:', err);
+            }
+        }
+
+        // Show create net modal
+        function showCreateNetModal() {
+            document.getElementById('create-net-modal').classList.add('show');
+            document.getElementById('new-net-name').focus();
+        }
+
+        // Close create net modal
+        function closeCreateNetModal(event) {
+            if (!event || event.target.id === 'create-net-modal') {
+                document.getElementById('create-net-modal').classList.remove('show');
+                document.getElementById('new-net-name').value = '';
+                document.getElementById('new-net-description').value = '';
+            }
+        }
+
+        // Create a new net
+        async function createNet() {
+            if (!currentUser) return;
+
+            const name = document.getElementById('new-net-name').value.trim().toUpperCase().replace(/\s+/g, '_');
+            const description = document.getElementById('new-net-description').value.trim();
+
+            if (!name) {
+                showToast('Please enter a net name');
+                return;
+            }
+
+            try {
+                const net = await api('/api/nets', {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id, name, description })
+                });
+
+                closeCreateNetModal();
+                showToast('NET_CREATED! You are now LIVE');
+                await joinNet(net.id);
+                await loadNets();
+                await loadNetsInOverview();
+            } catch (err) {
+                showToast('Error creating net');
+            }
+        }
+
+        // Join a net
+        async function joinNet(netId) {
+            if (!currentUser) return;
+
+            try {
+                await api(`/api/nets/${netId}/join`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id })
+                });
+
+                currentNetId = netId;
+                await loadNetRoom();
+                document.getElementById('net-popup').classList.add('show');
+
+                // Connect to LiveKit for real audio
+                await connectToLiveKitRoom(netId);
+
+                // Start auto-refresh
+                netRefreshInterval = setInterval(loadNetRoom, 5000);
+                netChatRefreshInterval = setInterval(loadNetChat, 3000);
+
+            } catch (err) {
+                showToast('Error joining net');
+            }
+        }
+
+        // Track previous role for token refresh
+        let previousNetRole = null;
+
+        // Load net room data
+        async function loadNetRoom() {
+            if (!currentNetId) return;
+
+            try {
+                const net = await api(`/api/nets/${currentNetId}`);
+                currentNetData = net;
+
+                // Update header
+                document.getElementById('net-room-name').textContent = net.name;
+                document.getElementById('net-room-host').textContent = `Hosted by: ${net.host_username}`;
+
+                // Get current user's role
+                const myParticipant = net.participants.find(p => p.user_id === currentUser.id);
+                const myRole = myParticipant?.role || 'listener';
+                const isHost = myRole === 'host' || myRole === 'co-host';
+
+                // Check if role upgraded to speaker - need to refresh token for mic access
+                const canSpeak = ['host', 'co-host', 'speaker'].includes(myRole);
+                const couldSpeakBefore = ['host', 'co-host', 'speaker'].includes(previousNetRole);
+                if (canSpeak && !couldSpeakBefore && livekitRoom && !localAudioTrack) {
+                    await refreshLiveKitToken();
+                }
+                previousNetRole = myRole;
+
+                // Render speakers
+                const speakers = net.participants.filter(p => ['host', 'co-host', 'speaker'].includes(p.role));
+                const speakersGrid = document.getElementById('speakers-grid');
+                speakersGrid.innerHTML = speakers.map(speaker => `
+                    <div class="speaker-card ${speaker.role}">
+                        ${speaker.is_muted ? '<span class="speaker-muted">🔇</span>' : ''}
+                        <div class="speaker-avatar">${speaker.username.charAt(0)}</div>
+                        <div class="speaker-name">${speaker.username}</div>
+                        <div class="speaker-role">${speaker.role.toUpperCase()}</div>
+                        ${isHost && speaker.role === 'speaker' ? `
+                            <button class="request-btn deny" style="margin-top: 5px;" onclick="demoteSpeaker(${speaker.user_id})">DEMOTE</button>
+                        ` : ''}
+                    </div>
+                `).join('');
+
+                // Render listeners
+                const listeners = net.participants.filter(p => p.role === 'listener');
+                document.getElementById('listeners-count').textContent = `LISTENERS: ${listeners.length}`;
+                document.getElementById('listeners-list').innerHTML = listeners.map(listener => `
+                    <span class="listener-badge">${listener.username}</span>
+                `).join('');
+
+                // Render speak requests (for hosts only)
+                const requestsPanel = document.getElementById('requests-panel');
+                if (isHost && net.pendingRequests?.length > 0) {
+                    requestsPanel.classList.remove('hidden');
+                    document.getElementById('requests-list').innerHTML = net.pendingRequests.map(req => `
+                        <div class="request-item">
+                            <span>${req.username} wants to speak</span>
+                            <div class="request-actions">
+                                <button class="request-btn approve" onclick="approveSpeaker(${req.id}, ${req.user_id})">APPROVE</button>
+                                <button class="request-btn deny" onclick="denySpeaker(${req.id})">DENY</button>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    requestsPanel.classList.add('hidden');
+                }
+
+                // Render controls based on role
+                renderNetControls(myRole, myParticipant?.is_muted);
+
+                // Also update mini player if it's visible
+                if (document.getElementById('net-mini-player').classList.contains('show')) {
+                    updateMiniPlayer();
+                }
+
+            } catch (err) {
+                console.error('Error loading net room:', err);
+            }
+        }
+
+        // Render net controls based on user role
+        function renderNetControls(role, isMuted) {
+            const controls = document.getElementById('net-controls');
+            let html = '';
+
+            if (role === 'host' || role === 'co-host') {
+                html += `
+                    <button class="net-control-btn ${isMuted ? 'unmute' : 'mute'}" onclick="toggleMute()">
+                        ${isMuted ? '🎤 UNMUTE' : '🔇 MUTE'}
+                    </button>
+                    <button class="net-control-btn danger" onclick="endNet()">END_NET</button>
+                `;
+            } else if (role === 'speaker') {
+                html += `
+                    <button class="net-control-btn ${isMuted ? 'unmute' : 'mute'}" onclick="toggleMute()">
+                        ${isMuted ? '🎤 UNMUTE' : '🔇 MUTE'}
+                    </button>
+                `;
+            } else {
+                html += `
+                    <button class="net-control-btn request" onclick="requestToSpeak()">✋ REQUEST_TO_SPEAK</button>
+                `;
+            }
+
+            html += `<button class="net-control-btn" onclick="leaveNet()">LEAVE_NET</button>`;
+            controls.innerHTML = html;
+        }
+
+        // Load net chat messages
+        async function loadNetChat() {
+            if (!currentNetId) return;
+
+            try {
+                const messages = await api(`/api/nets/${currentNetId}/messages`);
+                const chatContainer = document.getElementById('net-chat-messages');
+                const shouldScroll = chatContainer.scrollTop + chatContainer.clientHeight >= chatContainer.scrollHeight - 50;
+
+                chatContainer.innerHTML = messages.map(msg => {
+                    const time = new Date(msg.timestamp);
+                    const timeStr = `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+                    return `
+                        <div class="message" style="margin-bottom: 8px;">
+                            <span style="color: #ffaa00;">${msg.username}</span>
+                            <span style="color: #666; font-size: 9px;">[${timeStr}]</span>
+                            <div>${msg.content}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                if (shouldScroll) {
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+            } catch (err) {
+                console.error('Error loading net chat:', err);
+            }
+        }
+
+        // Send net chat message
+        async function sendNetMessage() {
+            if (!currentNetId || !currentUser) return;
+
+            const input = document.getElementById('net-chat-input');
+            const content = input.value.trim();
+            if (!content) return;
+
+            try {
+                await api(`/api/nets/${currentNetId}/messages`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id, content })
+                });
+                input.value = '';
+                await loadNetChat();
+            } catch (err) {
+                showToast('Error sending message');
+            }
+        }
+
+        // Toggle mute (for speakers)
+        async function toggleMute() {
+            if (!currentNetId || !currentUser) return;
+
+            try {
+                const result = await api(`/api/nets/${currentNetId}/toggle-mute`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id })
+                });
+
+                // Also mute/unmute actual LiveKit audio
+                if (localAudioTrack && livekitRoom) {
+                    if (result.is_muted) {
+                        await livekitRoom.localParticipant.setMicrophoneEnabled(false);
+                    } else {
+                        await livekitRoom.localParticipant.setMicrophoneEnabled(true);
+                    }
+                }
+
+                await loadNetRoom();
+            } catch (err) {
+                showToast('Error toggling mute');
+            }
+        }
+
+        // Request to speak
+        async function requestToSpeak() {
+            if (!currentNetId || !currentUser) return;
+
+            try {
+                const result = await api(`/api/nets/${currentNetId}/request-speak`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id })
+                });
+                showToast(result.message || 'Request sent to host');
+            } catch (err) {
+                showToast('Error requesting to speak');
+            }
+        }
+
+        // Approve speaker (host only)
+        async function approveSpeaker(requestId, targetUserId) {
+            if (!currentNetId || !currentUser) return;
+
+            try {
+                const result = await api(`/api/nets/${currentNetId}/approve-speaker`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id, targetUserId, requestId })
+                });
+
+                if (result.error) {
+                    showToast(result.error);
+                } else {
+                    showToast('Speaker approved');
+                    await loadNetRoom();
+                }
+            } catch (err) {
+                showToast('Error approving speaker');
+            }
+        }
+
+        // Deny speaker (host only)
+        async function denySpeaker(requestId) {
+            if (!currentNetId || !currentUser) return;
+
+            try {
+                await api(`/api/nets/${currentNetId}/deny-speaker`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id, requestId })
+                });
+                showToast('Request denied');
+                await loadNetRoom();
+            } catch (err) {
+                showToast('Error denying speaker');
+            }
+        }
+
+        // Demote speaker back to listener (host only)
+        async function demoteSpeaker(targetUserId) {
+            if (!currentNetId || !currentUser) return;
+
+            try {
+                await api(`/api/nets/${currentNetId}/demote-speaker`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id, targetUserId })
+                });
+                showToast('Speaker demoted to listener');
+                await loadNetRoom();
+            } catch (err) {
+                showToast('Error demoting speaker');
+            }
+        }
+
+        // Leave net
+        async function leaveNet() {
+            if (!currentNetId || !currentUser) return;
+
+            try {
+                await api(`/api/nets/${currentNetId}/leave`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id })
+                });
+                closeNetRoom();
+                showToast('Left the net');
+                await loadNets();
+                await loadNetsInOverview();
+            } catch (err) {
+                showToast('Error leaving net');
+            }
+        }
+
+        // End net (host only)
+        async function endNet() {
+            if (!currentNetId || !currentUser) return;
+
+            if (!confirm('Are you sure you want to end this net? All participants will be disconnected.')) return;
+
+            try {
+                await api(`/api/nets/${currentNetId}/end`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.id })
+                });
+                closeNetRoom();
+                showToast('Net ended');
+                await loadNets();
+                await loadNetsInOverview();
+            } catch (err) {
+                showToast('Error ending net');
+            }
+        }
+
+        // Close net room popup
+        function closeNetRoom() {
+            document.getElementById('net-popup').classList.remove('show');
+            document.getElementById('net-mini-player').classList.remove('show');
+            currentNetId = null;
+            currentNetData = null;
+            previousNetRole = null;
+
+            // Disconnect from LiveKit
+            cleanupLiveKit();
+
+            // Clear intervals
+            if (netRefreshInterval) {
+                clearInterval(netRefreshInterval);
+                netRefreshInterval = null;
+            }
+            if (netChatRefreshInterval) {
+                clearInterval(netChatRefreshInterval);
+                netChatRefreshInterval = null;
+            }
+        }
+
+        // Minimize net to mini player
+        function minimizeNet() {
+            if (!currentNetData) return;
+
+            // Hide full popup
+            document.getElementById('net-popup').classList.remove('show');
+
+            // Update and show mini player
+            document.getElementById('mini-player-name').textContent = currentNetData.name;
+            updateMiniPlayer();
+            document.getElementById('net-mini-player').classList.add('show');
+
+            showToast('Net minimized - tap to expand');
+        }
+
+        // Expand from mini player to full popup
+        function expandNet() {
+            document.getElementById('net-mini-player').classList.remove('show');
+            document.getElementById('net-popup').classList.add('show');
+        }
+
+        // Update mini player display
+        function updateMiniPlayer() {
+            if (!currentNetData) return;
+
+            const speakers = currentNetData.participants?.filter(p =>
+                ['host', 'co-host', 'speaker'].includes(p.role)
+            ) || [];
+            const listeners = currentNetData.participants?.filter(p => p.role === 'listener') || [];
+
+            // Update speakers display
+            const speakersEl = document.getElementById('mini-player-speakers');
+            speakersEl.innerHTML = speakers.slice(0, 4).map(s => `
+                <span class="mini-speaker">${s.is_muted ? '🔇' : '🎤'} ${s.username}</span>
+            `).join('');
+
+            if (speakers.length > 4) {
+                speakersEl.innerHTML += `<span class="mini-speaker">+${speakers.length - 4}</span>`;
+            }
+
+            // Update stats
+            document.getElementById('mini-player-stats').textContent =
+                `${speakers.length} speaker${speakers.length !== 1 ? 's' : ''} · ${listeners.length} listener${listeners.length !== 1 ? 's' : ''}`;
+
+            // Update mute button based on current user's state
+            const myParticipant = currentNetData.participants?.find(p => p.user_id === currentUser?.id);
+            const muteBtn = document.getElementById('mini-player-mute');
+
+            if (myParticipant && ['host', 'co-host', 'speaker'].includes(myParticipant.role)) {
+                muteBtn.style.display = 'block';
+                if (myParticipant.is_muted) {
+                    muteBtn.className = 'mini-player-mute muted';
+                    muteBtn.textContent = '🎤 UNMUTE';
+                } else {
+                    muteBtn.className = 'mini-player-mute unmuted';
+                    muteBtn.textContent = '🔇 MUTE';
+                }
+            } else {
+                muteBtn.style.display = 'none';
+            }
+        }
+
+        // Add enter key handler for net chat
+        document.addEventListener('DOMContentLoaded', function() {
+            const netChatInput = document.getElementById('net-chat-input');
+            if (netChatInput) {
+                netChatInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        sendNetMessage();
+                    }
+                });
+            }
+        });
 
         // Verification Flow Functions
         function goToStep(stepNumber) {
