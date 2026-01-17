@@ -3563,6 +3563,7 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
         }
 
         let currentChannelId = null;
+        let messagesMap = new Map(); // Store messages by ID for quick lookup
 
         async function switchChannel(channelId, channelName, isDM = false) {
             const rooms = document.querySelectorAll('.chat-room');
@@ -3601,6 +3602,9 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
         let contextMenuData = { messageId: null, username: null, content: null };
 
         function appendMessage(msg, container) {
+            // Store message in map for quick lookup
+            messagesMap.set(msg.id, msg);
+
             const timestamp = new Date(msg.timestamp);
             const timeStr = `[${String(timestamp.getHours()).padStart(2, '0')}${String(timestamp.getMinutes()).padStart(2, '0')}]`;
 
@@ -3613,9 +3617,13 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
 
             let replyHTML = '';
             if (msg.reply_to_id) {
+                const replyToMsg = messagesMap.get(msg.reply_to_id);
+                const replyUsername = replyToMsg ? replyToMsg.username : 'Unknown';
+                const replyPreview = replyToMsg ? (replyToMsg.content || '[Image]').substring(0, 50) : 'Message not found';
                 replyHTML = `
-                    <div style="padding: 4px 8px; margin-bottom: 4px; border-left: 2px solid #00ff41; background: rgba(0, 255, 65, 0.05); font-size: 9px; color: #888;">
-                        ↩ Replying to message
+                    <div style="padding: 4px 8px; margin-bottom: 4px; border-left: 2px solid #00ff41; background: rgba(0, 255, 65, 0.05); font-size: 9px;">
+                        <div style="color: #888;">↩ Replying to <span style="color: #ffaa00;">${replyUsername}</span></div>
+                        <div style="color: #666; margin-top: 2px;">${replyPreview}</div>
                     </div>
                 `;
             }
@@ -3692,6 +3700,57 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 cancelImage();
             }
         }
+
+        // Add Enter key and paste support to message input
+        document.addEventListener('DOMContentLoaded', function() {
+            const messageInput = document.getElementById('message-input');
+
+            // Enter key to send message
+            messageInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            // Paste image support
+            messageInput.addEventListener('paste', async function(e) {
+                const items = e.clipboardData?.items;
+                if (!items) return;
+
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+
+                    // Check if the item is an image
+                    if (item.type.startsWith('image/')) {
+                        e.preventDefault();
+
+                        const file = item.getAsFile();
+                        if (!file) continue;
+
+                        // Validate file size (5MB limit)
+                        if (file.size > 5 * 1024 * 1024) {
+                            alert('Image too large. Maximum size is 5MB.');
+                            return;
+                        }
+
+                        // Read the image as base64
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            selectedImageData = event.target.result;
+
+                            // Show preview
+                            const preview = document.getElementById('image-preview');
+                            const previewImg = document.getElementById('preview-img');
+                            previewImg.src = selectedImageData;
+                            preview.style.display = 'block';
+                        };
+                        reader.readAsDataURL(file);
+                        break;
+                    }
+                }
+            });
+        });
 
         function setReplyTo(messageId, username, content) {
             replyToMessageId = messageId;
