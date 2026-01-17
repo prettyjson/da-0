@@ -3204,14 +3204,14 @@ AUG  $24.9M  ██████████████████████�
 
     <!-- Reaction Picker -->
     <div id="reaction-picker" class="reaction-picker">
-        <div class="reaction-picker-emoji" onclick="addReaction('👍')">👍</div>
-        <div class="reaction-picker-emoji" onclick="addReaction('👎')">👎</div>
-        <div class="reaction-picker-emoji" onclick="addReaction('😊')">😊</div>
-        <div class="reaction-picker-emoji" onclick="addReaction('😅')">😅</div>
-        <div class="reaction-picker-emoji" onclick="addReaction('😂')">😂</div>
-        <div class="reaction-picker-emoji" onclick="addReaction('🔫')">🔫</div>
-        <div class="reaction-picker-emoji" onclick="addReaction('💥')">💥</div>
-        <div class="reaction-picker-emoji" onclick="addReaction('🔥')">🔥</div>
+        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('👍')">👍</div>
+        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('👎')">👎</div>
+        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('😊')">😊</div>
+        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('😅')">😅</div>
+        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('😂')">😂</div>
+        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('🔫')">🔫</div>
+        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('💥')">💥</div>
+        <div class="reaction-picker-emoji" onclick="event.stopPropagation(); addReaction('🔥')">🔥</div>
     </div>
 
     <!-- Terminal Modal -->
@@ -3942,7 +3942,17 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
         }
 
         async function toggleReaction(messageId, emoji) {
-            if (!currentUser) return;
+            if (!currentUser) {
+                console.error('No current user');
+                return;
+            }
+
+            if (!messageId) {
+                console.error('No message ID provided to toggleReaction');
+                return;
+            }
+
+            console.log('Toggling reaction:', { messageId, emoji, userId: currentUser.id });
 
             try {
                 const response = await api(`/api/messages/${messageId}/reactions`, {
@@ -3950,18 +3960,25 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                     body: JSON.stringify({ userId: currentUser.id, emoji })
                 });
 
+                console.log('Reaction toggle response:', response);
+
                 // Update will come via WebSocket, but update locally for immediate feedback
                 renderReactions(messageId, response.reactions);
             } catch (err) {
                 console.error('Failed to toggle reaction:', err);
+                showToast('Failed to add reaction');
             }
         }
 
         async function addReaction(emoji) {
-            if (!currentReactionMessageId) return;
+            const messageId = currentReactionMessageId;
+            if (!messageId) {
+                console.error('No message ID set for reaction');
+                return;
+            }
 
             closeReactionPicker();
-            await toggleReaction(currentReactionMessageId, emoji);
+            await toggleReaction(messageId, emoji);
         }
 
         function showReactionPicker(event, messageId) {
