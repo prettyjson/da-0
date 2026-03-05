@@ -21,10 +21,12 @@
     "@coinbase/cdp-sdk": "^1.44.1",
     "@supabase/supabase-js": "^2.98.0",
     "better-sqlite3": "^12.5.0",
+    "bufferutil": "^4.1.0",
     "cors": "^2.8.5",
     "express": "^5.2.1",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
+    "utf-8-validate": "^5.0.10",
     "viem": "^2.47.0",
     "ws": "^8.19.0"
   },
