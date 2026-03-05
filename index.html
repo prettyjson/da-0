@@ -358,58 +358,29 @@
                 <div id="network-map" class="network-map"></div>
             </div>
 
-            <!-- Top Members Leaderboard -->
+            <!-- Points Multiplier Breakdown (publicly visible) -->
+            <div class="multiplier-section" id="multiplier-section">
+                <div class="header-line" style="margin-bottom: 10px;">
+                    <span style="font-weight: bold;">EARLY_ADOPTER_MULTIPLIERS</span>
+                    <span id="current-tier-badge" style="font-size: 10px; color: #ffaa00;">LOADING...</span>
+                </div>
+                <div id="multiplier-table" class="multiplier-table"></div>
+            </div>
+
+            <!-- Top Members Leaderboard (points-based) -->
             <div class="members-table">
-                <div style="font-weight: bold; margin-bottom: 15px;">TOP_STAKEHOLDERS_LEADERBOARD</div>
+                <div class="header-line" style="margin-bottom: 15px;">
+                    <span style="font-weight: bold;">TOP_STAKEHOLDERS</span>
+                    <span id="user-rank-display" style="font-size: 10px; color: #ffaa00;"></span>
+                </div>
                 <div class="table-row">
                     <div class="table-cell">RANK</div>
                     <div class="table-cell">CALLSIGN</div>
                     <div class="table-cell">UNIT</div>
-                    <div class="table-cell">STAKE%</div>
+                    <div class="table-cell">POINTS</div>
                     <div class="table-cell">STATUS</div>
                 </div>
-                <div class="table-row">
-                    <div class="table-cell rank">001</div>
-                    <div class="table-cell">COL_HAYES_R</div>
-                    <div class="table-cell">10TH_MTN</div>
-                    <div class="table-cell percentage">8.7%</div>
-                    <div class="table-cell error-text">●</div>
-                </div>
-                <div class="table-row">
-                    <div class="table-cell rank">002</div>
-                    <div class="table-cell">MAJ_CHEN_L</div>
-                    <div class="table-cell">RANGER</div>
-                    <div class="table-cell percentage">7.2%</div>
-                    <div class="table-cell error-text">●</div>
-                </div>
-                <div class="table-row">
-                    <div class="table-cell rank">003</div>
-                    <div class="table-cell">CSGT_RODRIGUEZ</div>
-                    <div class="table-cell">MARSOC</div>
-                    <div class="table-cell percentage">6.8%</div>
-                    <div class="table-cell" style="color: #666;">○</div>
-                </div>
-                <div class="table-row">
-                    <div class="table-cell rank">004</div>
-                    <div class="table-cell">LCDR_PATEL_K</div>
-                    <div class="table-cell">SEAL_7</div>
-                    <div class="table-cell percentage">5.9%</div>
-                    <div class="table-cell error-text">●</div>
-                </div>
-                <div class="table-row">
-                    <div class="table-cell rank">...</div>
-                    <div class="table-cell">...</div>
-                    <div class="table-cell">...</div>
-                    <div class="table-cell">...</div>
-                    <div class="table-cell">...</div>
-                </div>
-                <div class="table-row">
-                    <div class="table-cell rank">087</div>
-                    <div class="table-cell warning-text" id="user-leaderboard-name">SGT_MARTINEZ_J</div>
-                    <div class="table-cell" id="user-leaderboard-unit">82ND_ABN</div>
-                    <div class="table-cell percentage">2.3%</div>
-                    <div class="table-cell error-text">●</div>
-                </div>
+                <div id="leaderboard-rows"></div>
             </div>
         </div>
 

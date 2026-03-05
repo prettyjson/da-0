@@ -231,6 +231,93 @@ app.get('/api/users/search', (req, res) => {
     res.json(users);
 });
 
+// ============ POINTS SYSTEM ============
+
+// Point values and multipliers
+const POINTS_CONFIG = {
+    actions: {
+        accepted_into_network: 500,
+        monthly_dues: 50,
+        donation_per_dollar: 1,
+        referral_accepted: 300,
+        profile_complete: 50,
+        first_chat_message: 25,
+    },
+    tiers: [
+        { name: 'FIRST_100', threshold: 100, multipliers: { accepted_into_network: 5, monthly_dues: 3, donation_per_dollar: 2, referral_accepted: 3, profile_complete: 2, first_chat_message: 2 } },
+        { name: 'FIRST_1000', threshold: 1000, multipliers: { accepted_into_network: 2, monthly_dues: 1.5, donation_per_dollar: 1.25, referral_accepted: 1.5, profile_complete: 1.5, first_chat_message: 1 } },
+        { name: 'STANDARD', threshold: Infinity, multipliers: { accepted_into_network: 1, monthly_dues: 1, donation_per_dollar: 1, referral_accepted: 1, profile_complete: 1, first_chat_message: 1 } },
+    ]
+};
+
+// Get current multiplier tier based on member count
+function getCurrentTier(memberCount) {
+    for (const tier of POINTS_CONFIG.tiers) {
+        if (memberCount < tier.threshold) return tier;
+    }
+    return POINTS_CONFIG.tiers[POINTS_CONFIG.tiers.length - 1];
+}
+
+// Get multiplier breakdown (publicly displayed)
+app.get('/api/points/multipliers', (req, res) => {
+    try {
+        const stats = db().prepare('SELECT total_members FROM network_stats WHERE id = 1').get();
+        const memberCount = stats ? stats.total_members : 0;
+        const currentTier = getCurrentTier(memberCount);
+
+        res.json({
+            memberCount,
+            currentTier: currentTier.name,
+            tiers: POINTS_CONFIG.tiers.map(t => ({
+                name: t.name,
+                threshold: t.threshold === Infinity ? null : t.threshold,
+                multipliers: t.multipliers,
+                isActive: t.name === currentTier.name,
+            })),
+            basePoints: POINTS_CONFIG.actions,
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to load multipliers' });
+    }
+});
+
+// Get leaderboard (ranked by points)
+app.get('/api/leaderboard', (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 20;
+        // For now, use stub data. Will query points from Supabase when wired up.
+        const leaders = db().prepare(`
+            SELECT id, username, rank_code, unit, stake_percentage, is_online
+            FROM users
+            ORDER BY stake_percentage DESC
+            LIMIT ?
+        `).all(limit);
+
+        // Map stake_percentage to points for now (stub)
+        const leaderboard = leaders.map((u, i) => ({
+            rank: i + 1,
+            callsign: u.username,
+            unit: u.unit,
+            points: Math.floor(u.stake_percentage * 1000),
+            isOnline: u.is_online === 1,
+        }));
+
+        res.json({ leaderboard });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to load leaderboard' });
+    }
+});
+
+// Get point breakdown for a specific user
+app.get('/api/points/:userId', (req, res) => {
+    // Stub - will be replaced with Supabase query on points_ledger
+    res.json({
+        totalPoints: 0,
+        rank: 0,
+        breakdown: [],
+    });
+});
+
 // ============ PROPOSALS/VOTES ROUTES (DEPRECATED - Vote tab removed for V1) ============
 /*
 app.get('/api/proposals', (req, res) => {

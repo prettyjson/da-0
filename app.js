@@ -157,7 +157,8 @@ async function loadAllData() {
         loadNets(),
         loadNetsInOverview(),
         loadUserProfile(),
-        loadNetworkMap()
+        loadNetworkMap(),
+        loadMultipliers()
     ]);
 }
 
@@ -249,51 +250,84 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
 
 // Load leaderboard
 async function loadLeaderboard() {
-    const leaders = await api('/api/members/leaderboard?limit=6');
-    const leaderboardContainer = document.querySelector('#overview .members-table');
+    try {
+        const data = await api('/api/leaderboard?limit=6');
+        const rows = data.leaderboard || [];
+        const container = document.getElementById('leaderboard-rows');
+        if (!container) return;
 
-    // Keep header row
-    const headerRow = leaderboardContainer.querySelector('.table-row:first-child');
-    leaderboardContainer.innerHTML = '';
-    leaderboardContainer.innerHTML = '<div style="font-weight: bold; margin-bottom: 15px;">TOP_STAKEHOLDERS_LEADERBOARD</div>';
-    leaderboardContainer.appendChild(headerRow);
+        container.innerHTML = '';
 
-    leaders.forEach((member, index) => {
-        const row = document.createElement('div');
-        row.className = 'table-row';
-        row.innerHTML = `
-            <div class="table-cell rank">${String(index + 1).padStart(3, '0')}</div>
-            <div class="table-cell">${member.username}</div>
-            <div class="table-cell">${member.unit || 'N/A'}</div>
-            <div class="table-cell percentage">${member.stake_percentage}%</div>
-            <div class="table-cell ${member.is_online ? 'error-text' : ''}" style="${!member.is_online ? 'color: #666;' : ''}">${member.is_online ? '●' : '○'}</div>
-        `;
-        leaderboardContainer.appendChild(row);
-    });
+        rows.forEach(member => {
+            const row = document.createElement('div');
+            row.className = 'table-row';
+            row.innerHTML = `
+                <div class="table-cell rank">${String(member.rank).padStart(3, '0')}</div>
+                <div class="table-cell">${member.callsign}</div>
+                <div class="table-cell">${member.unit || 'N/A'}</div>
+                <div class="table-cell percentage">${formatLargeNumber(member.points)}</div>
+                <div class="table-cell ${member.isOnline ? 'error-text' : ''}" style="${!member.isOnline ? 'color: #666;' : ''}">${member.isOnline ? '●' : '○'}</div>
+            `;
+            container.appendChild(row);
+        });
 
-    // Add ellipsis and current user
-    if (currentUser) {
-        const ellipsisRow = document.createElement('div');
-        ellipsisRow.className = 'table-row';
-        ellipsisRow.innerHTML = `
-            <div class="table-cell rank">...</div>
-            <div class="table-cell">...</div>
-            <div class="table-cell">...</div>
-            <div class="table-cell">...</div>
-            <div class="table-cell">...</div>
-        `;
-        leaderboardContainer.appendChild(ellipsisRow);
+        // Show current user's position
+        if (currentUser) {
+            const rankDisplay = document.getElementById('user-rank-display');
+            if (rankDisplay) {
+                rankDisplay.textContent = `YOUR POSITION: #${currentUser.rank || '?'} of ${rows.length}`;
+            }
+        }
+    } catch (err) {
+        console.error('Failed to load leaderboard:', err);
+    }
+}
 
-        const userRow = document.createElement('div');
-        userRow.className = 'table-row';
-        userRow.innerHTML = `
-            <div class="table-cell rank">087</div>
-            <div class="table-cell warning-text">${currentUser.username}</div>
-            <div class="table-cell">${currentUser.unit || 'N/A'}</div>
-            <div class="table-cell percentage">${currentUser.stake_percentage}%</div>
-            <div class="table-cell error-text">●</div>
-        `;
-        leaderboardContainer.appendChild(userRow);
+// Load multiplier breakdown (publicly visible)
+async function loadMultipliers() {
+    try {
+        const data = await api('/api/points/multipliers');
+        const container = document.getElementById('multiplier-table');
+        const badge = document.getElementById('current-tier-badge');
+        if (!container) return;
+
+        if (badge) {
+            badge.textContent = `${data.memberCount} MEMBERS | ${data.currentTier} ACTIVE`;
+        }
+
+        const actions = Object.keys(data.basePoints);
+        const actionLabels = {
+            accepted_into_network: 'ACCEPTED INTO NETWORK',
+            monthly_dues: 'MONTHLY DUES ($10)',
+            donation_per_dollar: 'DONATION (PER $1)',
+            referral_accepted: 'REFERRAL (ACCEPTED)',
+            profile_complete: 'PROFILE COMPLETE',
+            first_chat_message: 'FIRST CHAT MESSAGE',
+        };
+
+        let html = '<table><thead><tr><th>ACTION</th><th>BASE</th>';
+        data.tiers.forEach(tier => {
+            const label = tier.name.replace('_', ' ');
+            html += `<th class="${tier.isActive ? 'tier-active' : 'tier-inactive'}">${label}${tier.isActive ? ' ◄' : ''}</th>`;
+        });
+        html += '</tr></thead><tbody>';
+
+        actions.forEach(action => {
+            const base = data.basePoints[action];
+            html += `<tr><td>${actionLabels[action] || action}</td><td>${base}</td>`;
+            data.tiers.forEach(tier => {
+                const mult = tier.multipliers[action];
+                const pts = Math.floor(base * mult);
+                const cls = tier.isActive ? 'tier-active multiplier-value' : 'tier-inactive';
+                html += `<td class="${cls}">${mult}x (${formatLargeNumber(pts)})</td>`;
+            });
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    } catch (err) {
+        console.error('Failed to load multipliers:', err);
     }
 }
 

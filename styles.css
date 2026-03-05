@@ -2219,3 +2219,54 @@ body {
         height: 250px;
     }
 }
+
+/* ============================================================
+   POINTS / MULTIPLIER TABLE
+   ============================================================ */
+.multiplier-section {
+    margin: 15px 0;
+    border: 1px solid var(--border-dark);
+    padding: 15px;
+    background: rgba(0, 255, 65, 0.02);
+}
+
+.multiplier-table {
+    font-size: 11px;
+    overflow-x: auto;
+}
+
+.multiplier-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.multiplier-table th,
+.multiplier-table td {
+    padding: 6px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-dark);
+}
+
+.multiplier-table th {
+    color: #888;
+    font-weight: normal;
+    font-size: 10px;
+    text-transform: uppercase;
+}
+
+.multiplier-table td {
+    color: var(--primary-color);
+}
+
+.multiplier-table .tier-active {
+    color: #ffaa00;
+    font-weight: bold;
+}
+
+.multiplier-table .tier-inactive {
+    color: #555;
+}
+
+.multiplier-table .multiplier-value {
+    font-weight: bold;
+}
