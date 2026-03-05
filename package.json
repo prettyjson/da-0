@@ -25,7 +25,6 @@
     "express": "^5.2.1",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
-    "livekit-server-sdk": "^2.9.1",
     "viem": "^2.47.0",
     "ws": "^8.19.0"
   },

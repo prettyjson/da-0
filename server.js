@@ -4,17 +4,12 @@ const path = require('path');
 const http = require('http');
 const WebSocket = require('ws');
 const { initDatabase, getDatabase } = require('./db/init');
-const { AccessToken } = require('livekit-server-sdk');
+const cfVoice = require('./cloudflare-voice');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-
-// LiveKit configuration (set these in your environment)
-const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || '';
-const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || '';
-const LIVEKIT_URL = process.env.LIVEKIT_URL || '';
 
 // Initialize database
 initDatabase();
@@ -1114,6 +1109,9 @@ app.post('/api/nets/:id/end', (req, res) => {
         WHERE net_id = ? AND left_at IS NULL
     `).run(new Date().toISOString(), netId);
 
+    // End voice room
+    cfVoice.endRoom(netId).catch(err => console.error('Voice room end error:', err));
+
     // Broadcast net ended to all clients (including participants)
     broadcastToAll('net:ended', { netId });
 
@@ -1220,6 +1218,9 @@ app.post('/api/nets/:id/approve-speaker', (req, res) => {
         WHERE net_id = ? AND user_id = ?
     `).run(netId, targetUserId);
 
+    // Update voice room role
+    cfVoice.updateRole(netId, targetUserId, 'speaker');
+
     // Broadcast role change to all clients in this net
     broadcastToNet(netId, 'net:participant:role', { userId: targetUserId, role: 'speaker', isMuted: false });
 
@@ -1270,6 +1271,15 @@ app.post('/api/nets/:id/demote-speaker', (req, res) => {
         WHERE net_id = ? AND user_id = ?
     `).run(netId, targetUserId);
 
+    // Update voice room role
+    const voiceChange = cfVoice.updateRole(netId, targetUserId, 'listener');
+    if (voiceChange.removedTrack) {
+        broadcastToNet(netId, 'voice:track:removed', {
+            trackName: voiceChange.removedTrack,
+            userId: targetUserId,
+        });
+    }
+
     // Broadcast role change to all clients in this net
     broadcastToNet(netId, 'net:participant:role', { userId: targetUserId, role: 'listener', isMuted: true });
 
@@ -1294,6 +1304,9 @@ app.post('/api/nets/:id/toggle-mute', (req, res) => {
         UPDATE net_participants SET is_muted = ?
         WHERE net_id = ? AND user_id = ?
     `).run(newMuteState, netId, userId);
+
+    // Sync mute state with voice room
+    cfVoice.setMuted(netId, userId, Boolean(newMuteState));
 
     // Broadcast mute state change to all clients in this net
     broadcastToNet(netId, 'net:participant:mute', { userId, isMuted: Boolean(newMuteState) });
@@ -1347,123 +1360,154 @@ app.post('/api/nets/:id/messages', (req, res) => {
     res.json(message);
 });
 
-// ============ LIVEKIT TOKEN ROUTES ============
+// ============ CLOUDFLARE VOICE ROUTES ============
 
-// Get LiveKit connection info (for frontend)
-app.get('/api/livekit/config', (req, res) => {
-    res.json({
-        enabled: !!(LIVEKIT_API_KEY && LIVEKIT_API_SECRET && LIVEKIT_URL),
-        url: LIVEKIT_URL
-    });
+// Check if voice is configured
+app.get('/api/voice/config', (req, res) => {
+    res.json({ enabled: cfVoice.isEnabled() });
 });
 
-// Generate LiveKit token for joining a net
-app.post('/api/nets/:id/token', async (req, res) => {
-    const { userId } = req.body;
-    const netId = req.params.id;
+// Join a voice room — creates a CF session, returns SDP offer
+app.post('/api/voice/:netId/join', async (req, res) => {
+    const { userId, username, role } = req.body;
+    const netId = req.params.netId;
 
-    // Check if LiveKit is configured
-    if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+    if (!cfVoice.isEnabled()) {
         return res.status(503).json({
-            error: 'Audio not configured',
-            message: 'LiveKit credentials not set. Audio will be simulated.'
+            error: 'Voice not configured',
+            message: 'Cloudflare Calls credentials not set.',
         });
     }
-
-    // Get user info
-    const user = db().prepare('SELECT * FROM users WHERE id = ?').get(userId);
-    if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Get participant info to determine permissions
-    const participant = db().prepare(`
-        SELECT * FROM net_participants WHERE net_id = ? AND user_id = ? AND left_at IS NULL
-    `).get(netId, userId);
-
-    if (!participant) {
-        return res.status(403).json({ error: 'Must join net first' });
-    }
-
-    // Determine permissions based on role
-    const canPublish = ['host', 'co-host', 'speaker'].includes(participant.role);
-    const canSubscribe = true; // Everyone can listen
 
     try {
-        // Create access token
-        const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
-            identity: user.username,
-            name: user.username,
-            metadata: JSON.stringify({
-                rank: user.rank_code,
-                unit: user.unit,
-                role: participant.role
-            })
-        });
-
-        // Add video grant for the specific room (net)
-        at.addGrant({
-            room: `net-${netId}`,
-            roomJoin: true,
-            canPublish: canPublish,
-            canSubscribe: canSubscribe,
-            canPublishData: true // For any data channel needs
-        });
-
-        const token = await at.toJwt();
-
-        res.json({
-            token,
-            url: LIVEKIT_URL,
-            room: `net-${netId}`,
-            canPublish,
-            identity: user.username
-        });
+        const result = await cfVoice.joinRoom(netId, userId, username, role);
+        res.json(result);
     } catch (error) {
-        console.error('LiveKit token error:', error);
-        res.status(500).json({ error: 'Failed to generate token' });
+        console.error('Voice join error:', error);
+        res.status(500).json({ error: 'Failed to join voice room' });
     }
 });
 
-// Update token when role changes (e.g., approved to speak)
-app.post('/api/nets/:id/refresh-token', async (req, res) => {
-    const { userId } = req.body;
-    const netId = req.params.id;
-
-    if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
-        return res.status(503).json({ error: 'Audio not configured' });
-    }
-
-    const user = db().prepare('SELECT * FROM users WHERE id = ?').get(userId);
-    const participant = db().prepare(`
-        SELECT * FROM net_participants WHERE net_id = ? AND user_id = ? AND left_at IS NULL
-    `).get(netId, userId);
-
-    if (!user || !participant) {
-        return res.status(404).json({ error: 'Not found' });
-    }
-
-    const canPublish = ['host', 'co-host', 'speaker'].includes(participant.role);
+// Exchange SDP answer — complete WebRTC handshake
+app.post('/api/voice/:netId/answer', async (req, res) => {
+    const { userId, sessionDescription } = req.body;
+    const netId = req.params.netId;
 
     try {
-        const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
-            identity: user.username,
-            name: user.username
+        const room = cfVoice.getRoom(netId);
+        const participant = room.participants.get(String(userId));
+        if (!participant) {
+            return res.status(404).json({ error: 'Not in voice room' });
+        }
+
+        // Forward client's offer to CF and get answer
+        const result = await cfVoice.pushTrack(participant.sessionId, {
+            sessionDescription,
+            trackName: `audio-${userId}`,
         });
 
-        at.addGrant({
-            room: `net-${netId}`,
-            roomJoin: true,
-            canPublish: canPublish,
-            canSubscribe: true,
-            canPublishData: true
-        });
-
-        const token = await at.toJwt();
-        res.json({ token, canPublish, url: LIVEKIT_URL });
+        res.json(result);
     } catch (error) {
-        res.status(500).json({ error: 'Failed to refresh token' });
+        console.error('Voice answer error:', error);
+        res.status(500).json({ error: 'Failed to exchange SDP' });
     }
+});
+
+// Notify server that a track was published
+app.post('/api/voice/:netId/publish', async (req, res) => {
+    const { userId, trackName } = req.body;
+    const netId = req.params.netId;
+
+    try {
+        const trackInfo = await cfVoice.onTrackPublished(netId, userId, trackName);
+
+        // Notify other participants via WebSocket to pull this new track
+        if (trackInfo) {
+            broadcastToNet(netId, 'voice:track:new', trackInfo);
+        }
+
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Voice publish error:', error);
+        res.status(500).json({ error: 'Failed to publish track' });
+    }
+});
+
+// Pull remote tracks from other speakers
+app.post('/api/voice/:netId/pull', async (req, res) => {
+    const { userId, tracks } = req.body;
+    const netId = req.params.netId;
+
+    try {
+        const room = cfVoice.getRoom(netId);
+        const participant = room.participants.get(String(userId));
+        if (!participant) {
+            return res.status(404).json({ error: 'Not in voice room' });
+        }
+
+        const result = await cfVoice.pullTracks(participant.sessionId, tracks);
+
+        // Track which tracks this participant is pulling
+        tracks.forEach(t => {
+            if (!participant.pulledTracks.includes(t.trackName)) {
+                participant.pulledTracks.push(t.trackName);
+            }
+        });
+
+        res.json(result);
+    } catch (error) {
+        console.error('Voice pull error:', error);
+        res.status(500).json({ error: 'Failed to pull tracks' });
+    }
+});
+
+// Renegotiate session (role change, track changes)
+app.post('/api/voice/:netId/renegotiate', async (req, res) => {
+    const { userId, sessionDescription } = req.body;
+    const netId = req.params.netId;
+
+    try {
+        const room = cfVoice.getRoom(netId);
+        const participant = room.participants.get(String(userId));
+        if (!participant) {
+            return res.status(404).json({ error: 'Not in voice room' });
+        }
+
+        const result = await cfVoice.sendAnswer(participant.sessionId, sessionDescription.sdp);
+        res.json(result);
+    } catch (error) {
+        console.error('Voice renegotiate error:', error);
+        res.status(500).json({ error: 'Failed to renegotiate' });
+    }
+});
+
+// Leave voice room
+app.post('/api/voice/:netId/leave', async (req, res) => {
+    const { userId } = req.body;
+    const netId = req.params.netId;
+
+    try {
+        const result = await cfVoice.leaveRoom(netId, userId);
+
+        // Notify other participants to stop pulling this user's track
+        if (result.removedTrack) {
+            broadcastToNet(netId, 'voice:track:removed', {
+                trackName: result.removedTrack,
+                userId,
+            });
+        }
+
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Voice leave error:', error);
+        res.status(500).json({ error: 'Failed to leave voice room' });
+    }
+});
+
+// Debug: get voice room state
+app.get('/api/voice/:netId/state', (req, res) => {
+    const state = cfVoice.getRoomState(req.params.netId);
+    res.json(state || { error: 'No active voice room' });
 });
 
 // ============ MEMBERSHIP / DUES ============

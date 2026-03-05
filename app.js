@@ -1,5 +1,10 @@
 import { initMap, updateMapMarkers, updateMapStats } from './map.js';
 import { initWallet, sendEmailOTP, verifyOTP, loginWithGoogle, signOut, syncUserWithBackend, getWalletAddress } from './wallet.js';
+import {
+    joinVoiceRoom, leaveVoiceRoom, toggleMuteState, getMuteState,
+    onNewSpeaker, onSpeakerLeft, onPromotedToSpeaker, onDemotedToListener,
+    checkVoiceConfig, isConnected, playJoinSound, playLeaveSound,
+} from './voice.js';
 
 // Global state
 let currentStep = 1;
@@ -1385,28 +1390,17 @@ let ws = null;
 let wsReconnectAttempts = 0;
 const WS_MAX_RECONNECT_ATTEMPTS = 5;
 
-// LiveKit audio state
-let livekitRoom = null;
-let livekitEnabled = false;
-let localAudioTrack = null;
-let livekitUrl = '';
-let isReconnecting = false; // Flag to prevent cleanup during intentional reconnection
+// Voice state
+let voiceEnabled = false;
 
-// Check if LiveKit is configured on server
-async function checkLivekitConfig() {
-    try {
-        const config = await api('/api/livekit/config');
-        livekitEnabled = config.enabled;
-        livekitUrl = config.url;
-        console.log('LiveKit enabled:', livekitEnabled);
-    } catch (err) {
-        console.log('LiveKit not available');
-        livekitEnabled = false;
-    }
+// Check if voice (Cloudflare Calls) is configured on server
+async function checkVoiceEnabled() {
+    voiceEnabled = await checkVoiceConfig();
+    console.log('Voice enabled:', voiceEnabled);
 }
 
-// Initialize LiveKit check on page load
-document.addEventListener('DOMContentLoaded', checkLivekitConfig);
+// Initialize voice check on page load
+document.addEventListener('DOMContentLoaded', checkVoiceEnabled);
 
 // ============ WEBSOCKET REAL-TIME UPDATES ============
 
@@ -1517,13 +1511,44 @@ function handleWebSocketMessage(message) {
             break;
 
         case 'net:participant:join':
+            playJoinSound();
+            loadNetRoom();
+            break;
+
         case 'net:participant:leave':
+            playLeaveSound();
+            loadNetRoom();
+            break;
+
         case 'net:participant:role':
+            // If this user was promoted/demoted, handle voice change
+            if (data.userId === currentUser?.id) {
+                const isSpeaker = ['host', 'co-host', 'speaker'].includes(data.role);
+                if (isSpeaker) {
+                    onPromotedToSpeaker(currentNetId, currentUser);
+                } else {
+                    onDemotedToListener();
+                }
+            }
+            loadNetRoom();
+            break;
+
         case 'net:participant:mute':
         case 'net:request:new':
         case 'net:request:denied':
-            // Any participant or request change - reload the net room
             loadNetRoom();
+            break;
+
+        case 'voice:track:new':
+            // New speaker track — pull it
+            if (data.username !== currentUser?.username) {
+                onNewSpeaker(currentNetId, currentUser?.id, data);
+            }
+            break;
+
+        case 'voice:track:removed':
+            // Speaker left or was demoted
+            onSpeakerLeft(data.username);
             break;
 
         default:
@@ -1559,305 +1584,73 @@ function appendNetMessage(message) {
 // Connect WebSocket on page load
 document.addEventListener('DOMContentLoaded', connectWebSocket);
 
-// Connect to LiveKit room
-async function connectToLiveKitRoom(netId) {
-    if (!livekitEnabled || !window.LivekitClient) {
-        console.log('LiveKit not available, using simulation mode');
-        return false;
+// ============ VOICE (Cloudflare Calls) ============
+
+// Speaking state tracking for UI indicators
+const speakingUsers = new Set();
+
+/**
+ * Handle speaking state changes from the voice module.
+ * Updates speaker cards with speaking glow indicator.
+ */
+function handleSpeakingChange(username, isSpeaking) {
+    if (isSpeaking) {
+        speakingUsers.add(username);
+    } else {
+        speakingUsers.delete(username);
     }
 
-    // If already connected to this room, don't reconnect
-    if (livekitRoom && livekitRoom.state === 'connected') {
-        console.log('Already connected to LiveKit room');
-        return true;
-    }
-
-    try {
-        console.log('Connecting to LiveKit room for net:', netId);
-
-        // Get token from server
-        const tokenData = await api(`/api/nets/${netId}/token`, {
-            method: 'POST',
-            body: JSON.stringify({ userId: currentUser.id })
-        });
-
-        if (tokenData.error) {
-            console.log('Token error:', tokenData.message);
-            return false;
-        }
-
-        console.log('Token received. Can publish:', tokenData.canPublish);
-
-        // Create and connect to room
-        livekitRoom = new LivekitClient.Room({
-            adaptiveStream: true,
-            dynacast: true,
-            audioCaptureDefaults: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            }
-        });
-
-        // Set up event listeners
-        livekitRoom.on(LivekitClient.RoomEvent.TrackSubscribed, handleTrackSubscribed);
-        livekitRoom.on(LivekitClient.RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
-        livekitRoom.on(LivekitClient.RoomEvent.ParticipantConnected, handleParticipantConnected);
-        livekitRoom.on(LivekitClient.RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
-        livekitRoom.on(LivekitClient.RoomEvent.Disconnected, handleRoomDisconnected);
-        livekitRoom.on(LivekitClient.RoomEvent.ActiveSpeakersChanged, handleActiveSpeakers);
-
-        // Connect
-        await livekitRoom.connect(tokenData.url, tokenData.token);
-        console.log('✓ Connected to LiveKit room:', tokenData.room);
-        console.log('Room state:', livekitRoom.state);
-        console.log('Remote participants:', livekitRoom.remoteParticipants.size);
-
-        // Handle existing participants and their tracks
-        livekitRoom.remoteParticipants.forEach(participant => {
-            console.log('Found existing participant:', participant.identity);
-
-            // Subscribe to existing audio tracks
-            participant.audioTrackPublications.forEach(publication => {
-                console.log(`  - Audio track publication:`, publication.trackSid, 'subscribed:', publication.isSubscribed);
-                if (publication.isSubscribed && publication.audioTrack) {
-                    handleTrackSubscribed(publication.audioTrack, publication, participant);
-                }
-            });
-        });
-
-        // If we can publish (speaker/host), enable mic
-        if (tokenData.canPublish) {
-            console.log('User can publish - enabling microphone');
-            await enableLocalAudio();
-        } else {
-            console.log('User is listener only');
-        }
-
-        showToast('AUDIO_CONNECTED');
-        return true;
-    } catch (err) {
-        console.error('✗ LiveKit connection error:', err);
-        showToast('Audio connection failed - using text only');
-        return false;
-    }
-}
-
-// Enable local audio (microphone)
-async function enableLocalAudio() {
-    if (!livekitRoom) {
-        console.error('Cannot enable audio - no LiveKit room');
-        return;
-    }
-
-    // If already have local audio track, don't create another
-    if (localAudioTrack) {
-        console.log('Local audio track already enabled');
-        return;
-    }
-
-    try {
-        console.log('Creating local audio track...');
-        localAudioTrack = await LivekitClient.createLocalAudioTrack({
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-        });
-
-        console.log('Publishing local audio track...');
-        await livekitRoom.localParticipant.publishTrack(localAudioTrack);
-        console.log('✓ Microphone enabled and published');
-    } catch (err) {
-        console.error('✗ Error enabling microphone:', err);
-        showToast('MICROPHONE_ERROR: Check permissions');
-        localAudioTrack = null;
-    }
-}
-
-// Disable local audio
-async function disableLocalAudio() {
-    if (localAudioTrack) {
-        try {
-            console.log('Disabling local audio...');
-            if (livekitRoom?.localParticipant) {
-                await livekitRoom.localParticipant.unpublishTrack(localAudioTrack);
-            }
-            localAudioTrack.stop();
-            localAudioTrack = null;
-            console.log('✓ Microphone disabled');
-        } catch (err) {
-            console.error('Error disabling microphone:', err);
-            localAudioTrack = null;
-        }
-    }
-}
-
-// Handle incoming audio tracks
-async function handleTrackSubscribed(track, publication, participant) {
-    if (track.kind === 'audio') {
-        console.log('Subscribing to audio track from:', participant.identity);
-
-        // Remove existing audio element for this participant (prevents duplicates)
-        const existingElement = document.getElementById(`audio-${participant.identity}`);
-        if (existingElement) {
-            console.log('Removing existing audio element for:', participant.identity);
-            existingElement.remove();
-        }
-
-        const audioElement = track.attach();
-        audioElement.id = `audio-${participant.identity}`;
-        audioElement.autoplay = true;
-        audioElement.playsInline = true;
-        audioElement.volume = 1.0; // Full volume
-        document.body.appendChild(audioElement);
-
-        // Explicitly play the audio element to ensure it works
-        try {
-            await audioElement.play();
-            console.log('✓ Audio track playing:', participant.identity);
-        } catch (err) {
-            console.warn('Audio autoplay blocked for:', participant.identity, err);
-            // Try again after a small delay
-            setTimeout(async () => {
-                try {
-                    await audioElement.play();
-                    console.log('✓ Audio playback retry successful:', participant.identity);
-                } catch (retryErr) {
-                    console.error('✗ Audio playback failed:', participant.identity, retryErr);
-                    showToast('Audio playback issue - check browser permissions');
-                }
-            }, 100);
-        }
-    }
-}
-
-// Handle track unsubscribe
-function handleTrackUnsubscribed(track, publication, participant) {
-    if (track.kind === 'audio') {
-        track.detach().forEach(el => el.remove());
-        const audioEl = document.getElementById(`audio-${participant.identity}`);
-        if (audioEl) audioEl.remove();
-    }
-}
-
-// Handle new participant
-function handleParticipantConnected(participant) {
-    console.log('Participant joined:', participant.identity);
-}
-
-// Handle participant leaving
-function handleParticipantDisconnected(participant) {
-    console.log('Participant left:', participant.identity);
-    const audioEl = document.getElementById(`audio-${participant.identity}`);
-    if (audioEl) audioEl.remove();
-}
-
-// Handle room disconnect
-function handleRoomDisconnected() {
-    console.log('Disconnected from LiveKit room');
-    // Don't cleanup if we're doing an intentional reconnection for token refresh
-    if (!isReconnecting) {
-        cleanupLiveKit();
-    }
-}
-
-// Handle active speakers (visual indicator)
-function handleActiveSpeakers(speakers) {
-    // Update UI to show who's speaking
+    // Update speaker cards UI
     document.querySelectorAll('.speaker-card').forEach(card => {
-        card.classList.remove('speaking');
+        const nameEl = card.querySelector('.speaker-name');
+        if (nameEl?.textContent === username) {
+            card.classList.toggle('speaking', isSpeaking);
+        }
     });
 
-    speakers.forEach(speaker => {
-        const speakerCards = document.querySelectorAll('.speaker-card');
-        speakerCards.forEach(card => {
-            if (card.querySelector('.speaker-name')?.textContent === speaker.identity) {
-                card.classList.add('speaking');
-            }
-        });
+    // Update mini player speakers
+    document.querySelectorAll('.mini-speaker').forEach(el => {
+        if (el.dataset.username === username) {
+            el.classList.toggle('speaking', isSpeaking);
+        }
     });
 }
 
-// Cleanup LiveKit connection
-function cleanupLiveKit() {
-    console.log('Cleaning up LiveKit connection...');
-
-    if (localAudioTrack) {
-        try {
-            localAudioTrack.stop();
-            console.log('✓ Local audio track stopped');
-        } catch (err) {
-            console.error('Error stopping local audio track:', err);
-        }
-        localAudioTrack = null;
+/**
+ * Connect to voice room for a net.
+ */
+async function connectToVoiceRoom(netId, role) {
+    if (!voiceEnabled) {
+        console.log('Voice not available');
+        return false;
     }
-
-    if (livekitRoom) {
-        try {
-            livekitRoom.disconnect();
-            console.log('✓ LiveKit room disconnected');
-        } catch (err) {
-            console.error('Error disconnecting from room:', err);
-        }
-        livekitRoom = null;
-    }
-
-    // Remove all audio elements
-    const audioElements = document.querySelectorAll('[id^="audio-"]');
-    console.log(`Removing ${audioElements.length} audio elements`);
-    audioElements.forEach(el => el.remove());
-}
-
-// Refresh token when role changes (approved to speak)
-// Need to reconnect to LiveKit with new permissions
-async function refreshLiveKitToken() {
-    if (!livekitEnabled || !currentNetId) return;
 
     try {
-        const tokenData = await api(`/api/nets/${currentNetId}/refresh-token`, {
-            method: 'POST',
-            body: JSON.stringify({ userId: currentUser.id })
-        });
+        const success = await joinVoiceRoom(
+            netId,
+            currentUser,
+            role,
+            handleSpeakingChange, // speaking callback
+            null // track added callback
+        );
 
-        if (tokenData.canPublish && !localAudioTrack) {
-            // Need to disconnect and reconnect with new token for publish permissions
-            if (livekitRoom) {
-                console.log('Reconnecting to LiveKit with speaker permissions...');
-
-                // Set flag to prevent cleanup during reconnection
-                isReconnecting = true;
-
-                try {
-                    // Disconnect current session
-                    await livekitRoom.disconnect();
-
-                    // Reconnect with new token that has publish permissions
-                    await livekitRoom.connect(tokenData.url || livekitUrl, tokenData.token);
-                    console.log('Reconnected to LiveKit room');
-
-                    // Re-subscribe to existing participants' audio tracks
-                    livekitRoom.remoteParticipants.forEach(participant => {
-                        console.log('Re-subscribing to existing participant:', participant.identity);
-                        participant.audioTrackPublications.forEach(publication => {
-                            if (publication.isSubscribed && publication.audioTrack) {
-                                handleTrackSubscribed(publication.audioTrack, publication, participant);
-                            }
-                        });
-                    });
-
-                    // Now enable local audio
-                    await enableLocalAudio();
-                    showToast('MIC_ENABLED - You can now speak!');
-                } finally {
-                    // Clear reconnection flag
-                    isReconnecting = false;
-                }
-            }
+        if (success) {
+            showToast('AUDIO_CONNECTED');
         }
+        return success;
     } catch (err) {
-        console.error('Error refreshing token:', err);
-        showToast('Error enabling microphone');
+        console.error('Voice connection error:', err);
+        showToast('Audio connection failed');
+        return false;
     }
+}
+
+/**
+ * Disconnect from voice room.
+ */
+async function disconnectVoiceRoom() {
+    await leaveVoiceRoom();
+    speakingUsers.clear();
 }
 
 // Load all live nets
@@ -2010,8 +1803,10 @@ async function joinNet(netId) {
             console.log('Subscribed to WebSocket updates for net', currentNetId);
         }
 
-        // Connect to LiveKit for real audio
-        await connectToLiveKitRoom(netId);
+        // Connect to Cloudflare voice room
+        const myParticipant = (await api(`/api/nets/${netId}`)).participants?.find(p => p.user_id === currentUser.id);
+        const myRole = myParticipant?.role || 'listener';
+        await connectToVoiceRoom(netId, myRole);
 
         // Keep chat polling as fallback (reduced frequency since WebSocket handles it)
         netChatRefreshInterval = setInterval(loadNetChat, 30000);
@@ -2043,34 +1838,36 @@ async function loadNetRoom() {
         const myRole = myParticipant?.role || 'listener';
         const isHost = myRole === 'host' || myRole === 'co-host';
 
-        // Check if role upgraded to speaker - need to refresh token for mic access
-        const canSpeak = ['host', 'co-host', 'speaker'].includes(myRole);
-        const couldSpeakBefore = ['host', 'co-host', 'speaker'].includes(previousNetRole);
-        if (canSpeak && !couldSpeakBefore && livekitRoom && !localAudioTrack) {
-            await refreshLiveKitToken();
-        }
+        // Check if role upgraded to speaker - voice module handles promotion via WebSocket
         previousNetRole = myRole;
 
-        // Render speakers
+        // Render speakers (Clubhouse-style: prominent cards with speaking glow)
         const speakers = net.participants.filter(p => ['host', 'co-host', 'speaker'].includes(p.role));
         const speakersGrid = document.getElementById('speakers-grid');
-        speakersGrid.innerHTML = speakers.map(speaker => `
-            <div class="speaker-card ${speaker.role}">
-                ${speaker.is_muted ? '<span class="speaker-muted">🔇</span>' : ''}
-                <div class="speaker-avatar">${speaker.username.charAt(0)}</div>
+        speakersGrid.innerHTML = speakers.map(speaker => {
+            const isSpeakingNow = speakingUsers.has(speaker.username);
+            return `
+            <div class="speaker-card ${speaker.role}${isSpeakingNow ? ' speaking' : ''}${speaker.is_muted ? ' muted' : ''}">
+                <div class="speaker-avatar-ring${isSpeakingNow ? ' active' : ''}">
+                    <div class="speaker-avatar">${speaker.username.charAt(0)}</div>
+                </div>
+                ${speaker.is_muted ? '<span class="speaker-muted-badge">MIC OFF</span>' : ''}
                 <div class="speaker-name">${speaker.username}</div>
                 <div class="speaker-role">${speaker.role.toUpperCase()}</div>
                 ${isHost && speaker.role === 'speaker' ? `
                     <button class="request-btn deny" style="margin-top: 5px;" onclick="demoteSpeaker(${speaker.user_id})">DEMOTE</button>
                 ` : ''}
             </div>
-        `).join('');
+        `}).join('');
 
-        // Render listeners
+        // Render listeners (Clubhouse-style: smaller avatars in a row)
         const listeners = net.participants.filter(p => p.role === 'listener');
         document.getElementById('listeners-count').textContent = `LISTENERS: ${listeners.length}`;
         document.getElementById('listeners-list').innerHTML = listeners.map(listener => `
-            <span class="listener-badge">${listener.username}</span>
+            <div class="listener-avatar" title="${listener.username}">
+                <div class="listener-avatar-circle">${listener.username.charAt(0)}</div>
+                <div class="listener-name">${listener.username}</div>
+            </div>
         `).join('');
 
         // Render speak requests (for hosts only)
@@ -2192,18 +1989,8 @@ async function toggleMute() {
 
         console.log('Mute toggle result:', result.is_muted);
 
-        // Also mute/unmute actual LiveKit audio
-        if (livekitRoom && livekitRoom.localParticipant) {
-            if (result.is_muted) {
-                await livekitRoom.localParticipant.setMicrophoneEnabled(false);
-                console.log('Microphone muted');
-            } else {
-                await livekitRoom.localParticipant.setMicrophoneEnabled(true);
-                console.log('Microphone unmuted');
-            }
-        } else {
-            console.warn('Cannot toggle mute - no active LiveKit connection');
-        }
+        // Toggle actual microphone via voice module
+        toggleMuteState();
 
         await loadNetRoom();
     } catch (err) {
@@ -2334,8 +2121,8 @@ function closeNetRoom() {
     currentNetData = null;
     previousNetRole = null;
 
-    // Disconnect from LiveKit
-    cleanupLiveKit();
+    // Disconnect from voice room
+    disconnectVoiceRoom();
 
     // Clear intervals
     if (netRefreshInterval) {
@@ -2378,11 +2165,12 @@ function updateMiniPlayer() {
     ) || [];
     const listeners = currentNetData.participants?.filter(p => p.role === 'listener') || [];
 
-    // Update speakers display
+    // Update speakers display with speaking indicators
     const speakersEl = document.getElementById('mini-player-speakers');
-    speakersEl.innerHTML = speakers.slice(0, 4).map(s => `
-        <span class="mini-speaker">${s.is_muted ? '🔇' : '🎤'} ${s.username}</span>
-    `).join('');
+    speakersEl.innerHTML = speakers.slice(0, 4).map(s => {
+        const isSpeakingNow = speakingUsers.has(s.username);
+        return `<span class="mini-speaker${isSpeakingNow ? ' speaking' : ''}" data-username="${s.username}">${s.is_muted ? '🔇' : '🎤'} ${s.username}</span>`;
+    }).join('');
 
     if (speakers.length > 4) {
         speakersEl.innerHTML += `<span class="mini-speaker">+${speakers.length - 4}</span>`;
@@ -2737,11 +2525,12 @@ Object.assign(window, {
     completeVerification, contextMenuCopyText, contextMenuReact,
     contextMenuReply, copyInviteCode, createChannel, createNet,
     expandNet, generateInvite, goToStep, handleDLUpload,
-    handleImageSelect, handleLogin, joinStage, logout,
+    handleImageSelect, handleLogin, joinNet, logout,
     minimizeNet, searchUsers, sendMessage, sendNetMessage,
     shareInvite, showCreateNetModal, showLogin, showProfile,
     showSection, showSignup, startFaceVerification,
     startVerification, switchChannel, toggleMute, leaveNet,
+    endNet, requestToSpeak, approveSpeaker, denySpeaker, demoteSpeaker,
     handleDD214Upload,
     // CDP wallet auth
     handleWalletLogin, handleVerifyOTP, handleGoogleLogin,
