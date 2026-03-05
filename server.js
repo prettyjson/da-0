@@ -7,7 +7,7 @@ const { initDatabase, getDatabase } = require('./db/init');
 const { AccessToken } = require('livekit-server-sdk');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -228,7 +228,8 @@ app.get('/api/users/search', (req, res) => {
     res.json(users);
 });
 
-// ============ PROPOSALS/VOTES ROUTES ============
+// ============ PROPOSALS/VOTES ROUTES (DEPRECATED - Vote tab removed for V1) ============
+/*
 app.get('/api/proposals', (req, res) => {
     const { status } = req.query;
     let proposals;
@@ -307,6 +308,7 @@ app.get('/api/users/:userId/votes', (req, res) => {
 
     res.json(votes);
 });
+*/
 
 // ============ CHANNELS ROUTES ============
 app.get('/api/channels', (req, res) => {

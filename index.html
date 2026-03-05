@@ -2394,7 +2394,6 @@
             <button class="nav-tab active" onclick="showSection('overview')">OVERVIEW</button>
             <button class="nav-tab" onclick="showSection('treasury')">TREASURY</button>
             <button class="nav-tab" onclick="showSection('members')">MEMBERS</button>
-            <button class="nav-tab" onclick="showSection('votes')">VOTES</button>
             <button class="nav-tab" onclick="showSection('nets')">NETS</button>
             <button class="nav-tab" onclick="showSection('comms')">COMMS</button>
             <button class="nav-tab" style="margin-left: auto; border-color: #ff0000; color: #ff0000;" onclick="logout()">LOGOUT</button>
@@ -2669,105 +2668,6 @@ AUG  $24.9M  ██████████████████████�
                 >> FILTER --status [ONLINE|OFFLINE]<br/>
                 >> SORT --stake [ASC|DESC]<br/>
                 >> EXPORT --format CSV
-            </div>
-        </div>
-
-        <!-- Votes Section -->
-        <div id="votes" class="section">
-            <div class="votes-section">
-                <div style="font-weight: bold; margin-bottom: 15px;">ACTIVE_NETWORK_VOTES</div>
-                
-                <div class="vote-item">
-                    <div class="vote-title">PROPOSAL_001: Network Expansion to Coast Guard Veterans</div>
-                    <div style="color: #888; font-size: 11px; margin-bottom: 8px;">
-                        INITIATED: 08AUG25 | CLOSES: 15AUG25_2359Z | QUORUM: 67% | STATUS: ACTIVE
-                    </div>
-                    <div class="vote-bar">
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: 78%;"></div>
-                        </div>
-                        <span>YES: 78% (1,349 votes) | NO: 22% (381 votes)</span>
-                    </div>
-                    <div style="margin-top: 8px; font-size: 10px; color: #ffaa00;">
-                        >> YOUR_VOTE: NOT_CAST | WEIGHT: 2.3% | DEADLINE: 4d 11h 23m
-                    </div>
-                </div>
-
-                <div class="vote-item">
-                    <div class="vote-title">PROPOSAL_002: Monthly Member Benefit Increase</div>
-                    <div style="color: #888; font-size: 11px; margin-bottom: 8px;">
-                        INITIATED: 05AUG25 | CLOSES: 12AUG25_2359Z | QUORUM: 67% | STATUS: ACTIVE
-                    </div>
-                    <div class="vote-bar">
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: 45%;"></div>
-                        </div>
-                        <span>YES: 45% (821 votes) | NO: 55% (1,003 votes)</span>
-                    </div>
-                    <div style="margin-top: 8px; font-size: 10px; color: #00ff41;">
-                        >> YOUR_VOTE: YES | WEIGHT: 2.3% | DEADLINE: 1d 7h 42m
-                    </div>
-                </div>
-
-                <div class="vote-item">
-                    <div class="vote-title">PROPOSAL_003: Treasury Investment Strategy Change</div>
-                    <div style="color: #888; font-size: 11px; margin-bottom: 8px;">
-                        INITIATED: 03AUG25 | CLOSES: 10AUG25_2359Z | QUORUM: 67% | STATUS: ACTIVE
-                    </div>
-                    <div class="vote-bar">
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: 89%;"></div>
-                        </div>
-                        <span>YES: 89% (1,567 votes) | NO: 11% (193 votes)</span>
-                    </div>
-                    <div style="margin-top: 8px; font-size: 10px; color: #666;">
-                        >> YOUR_VOTE: NOT_CAST | WEIGHT: 2.3% | DEADLINE: 18h 15m
-                    </div>
-                </div>
-            </div>
-
-            <div class="votes-section">
-                <div style="font-weight: bold; margin-bottom: 15px;">RECENT_VOTE_HISTORY</div>
-                
-                <div class="vote-item">
-                    <div class="vote-title">PROPOSAL_099: Network Security Upgrade</div>
-                    <div style="color: #888; font-size: 11px; margin-bottom: 8px;">
-                        CLOSED: 01AUG25 | RESULT: PASSED | PARTICIPATION: 73%
-                    </div>
-                    <div class="vote-bar">
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: 91%;"></div>
-                        </div>
-                        <span>FINAL: YES: 91% (1,623 votes) | NO: 9% (160 votes)</span>
-                    </div>
-                    <div style="margin-top: 8px; font-size: 10px; color: #00ff41;">
-                        >> YOUR_VOTE: YES | IMPLEMENTATION: IN_PROGRESS
-                    </div>
-                </div>
-
-                <div class="vote-item">
-                    <div class="vote-title">PROPOSAL_098: Quarterly Dividend Distribution</div>
-                    <div style="color: #888; font-size: 11px; margin-bottom: 8px;">
-                        CLOSED: 28JUL25 | RESULT: PASSED | PARTICIPATION: 81%
-                    </div>
-                    <div class="vote-bar">
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: 87%;"></div>
-                        </div>
-                        <span>FINAL: YES: 87% (1,891 votes) | NO: 13% (283 votes)</span>
-                    </div>
-                    <div style="margin-top: 8px; font-size: 10px; color: #00ff41;">
-                        >> YOUR_VOTE: YES | STATUS: COMPLETED | PAYOUT: $847.12
-                    </div>
-                </div>
-            </div>
-
-            <div style="border: 1px solid #00ff41; padding: 15px; background: rgba(0, 255, 65, 0.02); font-size: 10px; color: #666;">
-                VOTING_COMMANDS:<br/>
-                >> VOTE [PROPOSAL_ID] [YES|NO|ABSTAIN]<br/>
-                >> DELEGATE [MEMBER_ID] --proposal [PROPOSAL_ID]<br/>
-                >> CREATE_PROPOSAL --title "TITLE" --description "DESC"<br/>
-                >> VIEW_PROPOSAL [PROPOSAL_ID] --details
             </div>
         </div>
 
@@ -3408,7 +3308,6 @@ AUG  $24.9M  ██████████████████████�
                 loadTreasury(),
                 loadLeaderboard(),
                 loadMembers(),
-                loadProposals(),
                 loadChannels(),
                 loadNets(),
                 loadNetsInOverview(),
@@ -3566,71 +3465,6 @@ AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
                 `;
                 membersContainer.appendChild(row);
             });
-        }
-
-        // Load proposals
-        async function loadProposals() {
-            const proposals = await api('/api/proposals');
-            let userVotes = [];
-            if (currentUser) {
-                userVotes = await api(`/api/users/${currentUser.id}/votes`);
-            }
-
-            const activeContainer = document.querySelector('#votes .votes-section:first-child');
-            const historyContainer = document.querySelector('#votes .votes-section:last-child');
-
-            activeContainer.innerHTML = '<div style="font-weight: bold; margin-bottom: 15px;">ACTIVE_NETWORK_VOTES</div>';
-            historyContainer.innerHTML = '<div style="font-weight: bold; margin-bottom: 15px;">RECENT_VOTE_HISTORY</div>';
-
-            proposals.forEach(proposal => {
-                const totalVotes = proposal.yes_count + proposal.no_count;
-                const yesPercent = totalVotes > 0 ? Math.round((proposal.yes_count / totalVotes) * 100) : 0;
-                const noPercent = 100 - yesPercent;
-
-                const userVote = userVotes.find(v => v.proposal_id === proposal.id);
-                const voteStatus = userVote
-                    ? `<span class="status-success">YOUR_VOTE: ${userVote.vote.toUpperCase()}</span>`
-                    : '<span class="warning-text">YOUR_VOTE: NOT_CAST</span>';
-
-                const voteItem = document.createElement('div');
-                voteItem.className = 'vote-item';
-                voteItem.onclick = () => showVoteDialog(proposal.id, proposal.title);
-                voteItem.innerHTML = `
-                    <div class="vote-title">PROPOSAL_${String(proposal.id).padStart(3, '0')}: ${proposal.title}</div>
-                    <div style="color: #888; font-size: 11px; margin-bottom: 8px;">
-                        INITIATED: ${proposal.initiated_date} | CLOSES: ${proposal.closes_date}_2359Z | QUORUM: ${proposal.quorum_required}% | STATUS: ${proposal.status.toUpperCase()}
-                    </div>
-                    <div class="vote-bar">
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${yesPercent}%;"></div>
-                        </div>
-                        <span>${proposal.status === 'active' ? '' : 'FINAL: '}YES: ${yesPercent}% (${formatLargeNumber(proposal.yes_count)} votes) | NO: ${noPercent}% (${formatLargeNumber(proposal.no_count)} votes)</span>
-                    </div>
-                    <div style="margin-top: 8px; font-size: 10px;">
-                        >> ${voteStatus} | WEIGHT: ${currentUser?.stake_percentage || 0}%
-                    </div>
-                `;
-
-                if (proposal.status === 'active') {
-                    activeContainer.appendChild(voteItem);
-                } else {
-                    historyContainer.appendChild(voteItem);
-                }
-            });
-        }
-
-        // Vote dialog
-        async function showVoteDialog(proposalId, title) {
-            if (!currentUser) return;
-
-            const vote = prompt(`Vote on "${title}"\n\nEnter: yes, no, or abstain`);
-            if (vote && ['yes', 'no', 'abstain'].includes(vote.toLowerCase())) {
-                await api(`/api/proposals/${proposalId}/vote`, {
-                    method: 'POST',
-                    body: JSON.stringify({ userId: currentUser.id, vote: vote.toLowerCase() })
-                });
-                await loadProposals();
-            }
         }
 
         // Load channels

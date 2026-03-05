@@ -1,16 +1,14 @@
 {
-  "name": "da-0",
+  "name": "the-o-club",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "The O Club - A niche social network for ex-military Officers",
+  "main": "server.js",
   "scripts": {
-    "start": "node server.js",
     "dev": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "http://local_proxy@127.0.0.1:40429/git/prettyjson/da-0"
+    "dev:vite": "vite",
+    "build": "vite build",
+    "start": "node server.js",
+    "preview": "vite preview"
   },
   "keywords": [],
   "author": "",
@@ -21,5 +19,8 @@
     "express": "^5.2.1",
     "livekit-server-sdk": "^2.9.1",
     "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "vite": "^7.3.1"
   }
 }
