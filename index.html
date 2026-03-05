@@ -418,60 +418,73 @@
             <div class="treasury-grid">
                 <div class="treasury-box">
                     <div style="font-weight: bold; margin-bottom: 15px;">TREASURY_BALANCE</div>
-                    <div class="big-number">$24,891,203.47</div>
+                    <div class="big-number" id="treasury-balance">$0.00</div>
+                    <div style="font-size: 10px; color: #666; margin-bottom: 10px;">ON-CHAIN USDC (BASE)</div>
                     <div class="stat-row">
                         <span class="stat-label">MEMBER_DUES:</span>
-                        <span class="stat-value">$18,234,901</span>
+                        <span class="stat-value" id="treasury-dues">$0</span>
                     </div>
                     <div class="stat-row">
-                        <span class="stat-label">INVESTMENTS:</span>
-                        <span class="stat-value">$6,456,302</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="stat-label">PENDING:</span>
-                        <span class="stat-value">$200,000</span>
+                        <span class="stat-label">DONATIONS:</span>
+                        <span class="stat-value" id="treasury-donations">$0</span>
                     </div>
                 </div>
-                
+
                 <div class="treasury-box">
-                    <div style="font-weight: bold; margin-bottom: 15px;">MONTHLY_SPENDING</div>
-                    <div class="big-number">$1,847,392.12</div>
+                    <div style="font-weight: bold; margin-bottom: 15px;">ALLOCATION</div>
                     <div class="stat-row">
-                        <span class="stat-label">OPERATIONS:</span>
-                        <span class="stat-value">$892,341</span>
+                        <span class="stat-label">MARKETING/ADS:</span>
+                        <span class="stat-value" id="treasury-marketing">40%</span>
                     </div>
                     <div class="stat-row">
-                        <span class="stat-label">MEMBER_SVCS:</span>
-                        <span class="stat-value">$634,821</span>
+                        <span class="stat-label">HOSTING/INFRA:</span>
+                        <span class="stat-value" id="treasury-hosting">30%</span>
                     </div>
                     <div class="stat-row">
-                        <span class="stat-label">ADMIN:</span>
-                        <span class="stat-value">$320,230</span>
+                        <span class="stat-label">RESERVE:</span>
+                        <span class="stat-value" id="treasury-reserve">30%</span>
                     </div>
                 </div>
             </div>
 
-            <div class="chart-container">
-                <div style="font-weight: bold; margin-bottom: 15px;">BUDGET_ALLOCATION_CHART</div>
-                <div class="ascii-chart">
-OPERATIONS     ████████████████████████████████████████████████ 48.3%
-MEMBER_SVCS    ████████████████████████████████████ 34.4%
-ADMIN          ████████████████████ 17.3%
-
-INCOME_STREAMS:
-MEMBER_DUES    ████████████████████████████████████████████████████████████ 73.2%
-INVESTMENTS    █████████████████████████ 25.9%
-DONATIONS      ██ 0.9%
-
-HISTORICAL_TREND (12_MONTHS):
-JAN  $22.1M  ████████████████████████████████████████████
-FEB  $22.8M  █████████████████████████████████████████████████
-MAR  $23.2M  ██████████████████████████████████████████████████████
-APR  $23.9M  █████████████████████████████████████████████████████████
-MAY  $24.1M  ██████████████████████████████████████████████████████████
-JUN  $24.3M  ███████████████████████████████████████████████████████████
-JUL  $24.6M  ████████████████████████████████████████████████████████████
-AUG  $24.9M  █████████████████████████████████████████████████████████████
+            <!-- Network Health Metrics -->
+            <div class="treasury-grid" style="margin-top: 15px;">
+                <div class="treasury-box">
+                    <div style="font-weight: bold; margin-bottom: 15px;">NETWORK_HEALTH</div>
+                    <div class="stat-row">
+                        <span class="stat-label">ACTIVE_MEMBERS:</span>
+                        <span class="stat-value" id="health-active">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">NEW_THIS_MONTH:</span>
+                        <span class="stat-value" id="health-new" style="color: #00ff41;">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">CHURNED:</span>
+                        <span class="stat-value" id="health-churned" style="color: #ff0000;">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">RECLAIMED:</span>
+                        <span class="stat-value" id="health-reclaimed" style="color: #ffaa00;">0</span>
+                    </div>
+                </div>
+                <div class="treasury-box">
+                    <div style="font-weight: bold; margin-bottom: 15px;">MEMBERSHIP</div>
+                    <div class="stat-row">
+                        <span class="stat-label">MONTHLY_DUES:</span>
+                        <span class="stat-value">$10.00</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">CHURN_RATE:</span>
+                        <span class="stat-value" id="health-churn-rate">0%</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">RECLAIM_RATE:</span>
+                        <span class="stat-value" id="health-reclaim-rate">0%</span>
+                    </div>
+                    <div style="margin-top: 15px; font-size: 10px; color: #666;">
+                        ALL CASH STORED AS USDC ON BASE
+                    </div>
                 </div>
             </div>
         </div>

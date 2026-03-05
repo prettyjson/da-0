@@ -1466,6 +1466,61 @@ app.post('/api/nets/:id/refresh-token', async (req, res) => {
     }
 });
 
+// ============ MEMBERSHIP / DUES ============
+
+// Get membership status for current user
+app.get('/api/membership/:userId', (req, res) => {
+    // Stub - will query Supabase for membership_status, dues_paid_through, trial_ends_at
+    res.json({
+        status: 'active',
+        duesPaidThrough: '2026-03-31',
+        autoRenew: true,
+        monthlyAmount: 10,
+    });
+});
+
+// Enable auto-dues (store signed EIP-712 permission)
+app.post('/api/membership/enable-dues', (req, res) => {
+    const { userId, walletAddress, signedPermission } = req.body;
+    // Stub - will store in Supabase spend_permissions table
+    // See spend-permissions.js for the full pattern
+    res.json({ success: true, message: 'Auto-dues enabled' });
+});
+
+// Disable auto-dues (revoke permission)
+app.post('/api/membership/disable-dues', (req, res) => {
+    const { userId } = req.body;
+    // Stub - will set revoked_at on spend_permissions, member stays active through paid period
+    res.json({ success: true, message: 'Auto-dues disabled. Active through end of paid period.' });
+});
+
+// Make a one-time donation
+app.post('/api/donations', (req, res) => {
+    const { userId, amount, txHash } = req.body;
+    // Stub - will insert into donations table
+    res.json({ success: true, pointsAwarded: Math.floor(amount * 1) });
+});
+
+// Get network health metrics
+app.get('/api/network-health', (req, res) => {
+    try {
+        const stats = db().prepare('SELECT * FROM network_stats WHERE id = 1').get();
+        const totalMembers = stats ? stats.total_members : 0;
+
+        // Stub health metrics - will be real when Supabase is wired
+        res.json({
+            activeMembers: totalMembers,
+            newThisMonth: 3,
+            churned: 0,
+            reclaimed: 0,
+            churnRate: '0%',
+            reclaimRate: '0%',
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to load network health' });
+    }
+});
+
 // ============ LOCATIONS / MAP ============
 
 // Get all primary locations for the map

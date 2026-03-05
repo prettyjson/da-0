@@ -313,52 +313,46 @@ async function loadNetworkStats() {
 
 // Load treasury data
 async function loadTreasury() {
-    const treasury = await api('/api/treasury');
+    try {
+        const [treasury, health] = await Promise.all([
+            api('/api/treasury'),
+            api('/api/network-health'),
+        ]);
 
-    // Update treasury balance box
-    document.querySelector('#treasury .treasury-box:first-child .big-number').textContent = formatCurrency(treasury.balance);
-    const balanceRows = document.querySelectorAll('#treasury .treasury-box:first-child .stat-row');
-    balanceRows[0].querySelector('.stat-value').textContent = formatCurrency(treasury.member_dues);
-    balanceRows[1].querySelector('.stat-value').textContent = formatCurrency(treasury.investments);
-    balanceRows[2].querySelector('.stat-value').textContent = formatCurrency(treasury.pending);
+        // Treasury balance
+        const balanceEl = document.getElementById('treasury-balance');
+        if (balanceEl) balanceEl.textContent = formatCurrency(treasury.balance || 0);
 
-    // Update spending box
-    document.querySelector('#treasury .treasury-box:last-child .big-number').textContent = formatCurrency(treasury.monthly_spending);
-    const spendingRows = document.querySelectorAll('#treasury .treasury-box:last-child .stat-row');
-    spendingRows[0].querySelector('.stat-value').textContent = formatCurrency(treasury.operations_spending);
-    spendingRows[1].querySelector('.stat-value').textContent = formatCurrency(treasury.member_services_spending);
-    spendingRows[2].querySelector('.stat-value').textContent = formatCurrency(treasury.admin_spending);
+        const duesEl = document.getElementById('treasury-dues');
+        if (duesEl) duesEl.textContent = formatCurrency(treasury.member_dues || 0);
 
-    // Update ASCII chart with real percentages
-    const totalSpending = treasury.operations_spending + treasury.member_services_spending + treasury.admin_spending;
-    const opsPct = ((treasury.operations_spending / totalSpending) * 100).toFixed(1);
-    const svcPct = ((treasury.member_services_spending / totalSpending) * 100).toFixed(1);
-    const adminPct = ((treasury.admin_spending / totalSpending) * 100).toFixed(1);
+        const donationsEl = document.getElementById('treasury-donations');
+        if (donationsEl) donationsEl.textContent = formatCurrency(treasury.donations_total || 0);
 
-    const totalIncome = treasury.member_dues + treasury.investments + (treasury.pending * 0.1);
-    const duesPct = ((treasury.member_dues / totalIncome) * 100).toFixed(1);
-    const invPct = ((treasury.investments / totalIncome) * 100).toFixed(1);
+        // Allocation percentages
+        const mktEl = document.getElementById('treasury-marketing');
+        if (mktEl) mktEl.textContent = (treasury.marketing_pct || 40) + '%';
+        const hostEl = document.getElementById('treasury-hosting');
+        if (hostEl) hostEl.textContent = (treasury.hosting_pct || 30) + '%';
+        const resEl = document.getElementById('treasury-reserve');
+        if (resEl) resEl.textContent = (treasury.reserve_pct || 30) + '%';
 
-    const chart = `OPERATIONS     ${'█'.repeat(Math.floor(opsPct / 2))} ${opsPct}%
-MEMBER_SVCS    ${'█'.repeat(Math.floor(svcPct / 2))} ${svcPct}%
-ADMIN          ${'█'.repeat(Math.floor(adminPct / 2))} ${adminPct}%
-
-INCOME_STREAMS:
-MEMBER_DUES    ${'█'.repeat(Math.floor(duesPct))} ${duesPct}%
-INVESTMENTS    ${'█'.repeat(Math.floor(invPct / 2.5))} ${invPct}%
-DONATIONS      ${'█'.repeat(2)} 0.9%
-
-HISTORICAL_TREND (12_MONTHS):
-JAN  $22.1M  ${'█'.repeat(44)}
-FEB  $22.8M  ${'█'.repeat(49)}
-MAR  $23.2M  ${'█'.repeat(54)}
-APR  $23.9M  ${'█'.repeat(57)}
-MAY  $24.1M  ${'█'.repeat(58)}
-JUN  $24.3M  ${'█'.repeat(59)}
-JUL  $24.6M  ${'█'.repeat(60)}
-AUG  $${(treasury.balance / 1000000).toFixed(1)}M  ${'█'.repeat(61)}`;
-
-    document.querySelector('.ascii-chart').textContent = chart;
+        // Network health
+        const activeEl = document.getElementById('health-active');
+        if (activeEl) activeEl.textContent = formatLargeNumber(health.activeMembers || 0);
+        const newEl = document.getElementById('health-new');
+        if (newEl) newEl.textContent = health.newThisMonth || 0;
+        const churnedEl = document.getElementById('health-churned');
+        if (churnedEl) churnedEl.textContent = health.churned || 0;
+        const reclaimedEl = document.getElementById('health-reclaimed');
+        if (reclaimedEl) reclaimedEl.textContent = health.reclaimed || 0;
+        const churnRateEl = document.getElementById('health-churn-rate');
+        if (churnRateEl) churnRateEl.textContent = health.churnRate || '0%';
+        const reclaimRateEl = document.getElementById('health-reclaim-rate');
+        if (reclaimRateEl) reclaimRateEl.textContent = health.reclaimRate || '0%';
+    } catch (err) {
+        console.error('Failed to load treasury:', err);
+    }
 }
 
 // Load leaderboard
