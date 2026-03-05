@@ -4,5 +4,8 @@ nixPkgs = ["nodejs_20", "python3"]
 [phases.install]
 cmds = ["npm ci"]
 
+[phases.build]
+cmds = ["npm run build"]
+
 [start]
-cmd = "npm start"
+cmd = "NODE_ENV=production npm start"

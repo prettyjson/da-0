@@ -314,32 +314,28 @@
                     </div>
                     
                     <div class="stat-row">
-                        <span class="stat-label">TOTAL_MEMBERS:</span>
-                        <span class="stat-value">1,729,314</span>
+                        <span class="stat-label">TOTAL_OFFICERS:</span>
+                        <span class="stat-value" id="stat-total-members">0</span>
                     </div>
                     <div class="stat-row">
-                        <span class="stat-label">ANNUAL_INCOME:</span>
-                        <span class="stat-value">$157,651,814,346</span>
+                        <span class="stat-label">ACTIVE:</span>
+                        <span class="stat-value" id="stat-active">0</span>
                     </div>
                     <div class="stat-row">
-                        <span class="stat-label">ACTIVE_NODES:</span>
-                        <span class="stat-value">136,794,270</span>
+                        <span class="stat-label">TREASURY:</span>
+                        <span class="stat-value" id="stat-treasury">$0</span>
                     </div>
                     <div class="stat-row">
-                        <span class="stat-label">TREASURY_BAL:</span>
-                        <span class="stat-value">$24,891,203</span>
+                        <span class="stat-label">YOUR_POINTS:</span>
+                        <span class="stat-value percentage" id="stat-user-points">0</span>
                     </div>
                     <div class="stat-row">
-                        <span class="stat-label">YOUR_STAKE:</span>
-                        <span class="stat-value percentage">2.3%</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="stat-label">LAST_DIVIDEND:</span>
-                        <span class="stat-value">$847.12</span>
+                        <span class="stat-label">YOUR_RANK:</span>
+                        <span class="stat-value" id="stat-user-rank">#--</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">STATUS:</span>
-                        <span class="stat-value error-text">AUTHENTICATED</span>
+                        <span class="stat-value error-text" id="stat-membership-status">VERIFIED</span>
                     </div>
                 </div>
 
@@ -492,79 +488,15 @@
         <!-- Members Section -->
         <div id="members" class="section">
             <div class="members-table">
-                <div style="font-weight: bold; margin-bottom: 15px;">COMPLETE_MEMBER_DIRECTORY</div>
+                <div style="font-weight: bold; margin-bottom: 15px;">MEMBER_DIRECTORY</div>
                 <div class="table-row">
                     <div class="table-cell">RANK</div>
                     <div class="table-cell">CALLSIGN</div>
                     <div class="table-cell">UNIT</div>
-                    <div class="table-cell">STAKE%</div>
+                    <div class="table-cell">POINTS</div>
                     <div class="table-cell">STATUS</div>
                 </div>
-                <div class="table-row">
-                    <div class="table-cell rank">001</div>
-                    <div class="table-cell">COL_HAYES_R</div>
-                    <div class="table-cell">10TH_MTN</div>
-                    <div class="table-cell percentage">8.7%</div>
-                    <div class="table-cell error-text">●</div>
-                </div>
-                <div class="table-row">
-                    <div class="table-cell rank">002</div>
-                    <div class="table-cell">MAJ_CHEN_L</div>
-                    <div class="table-cell">RANGER</div>
-                    <div class="table-cell percentage">7.2%</div>
-                    <div class="table-cell error-text">●</div>
-                </div>
-                <div class="table-row">
-                    <div class="table-cell rank">003</div>
-                    <div class="table-cell">CSGT_RODRIGUEZ</div>
-                    <div class="table-cell">MARSOC</div>
-                    <div class="table-cell percentage">6.8%</div>
-                    <div class="table-cell" style="color: #666;">○</div>
-                </div>
-                <div class="table-row">
-                    <div class="table-cell rank">004</div>
-                    <div class="table-cell">LCDR_PATEL_K</div>
-                    <div class="table-cell">SEAL_7</div>
-                    <div class="table-cell percentage">5.9%</div>
-                    <div class="table-cell error-text">●</div>
-                </div>
-                <div class="table-row">
-                    <div class="table-cell rank">005</div>
-                    <div class="table-cell">CPT_WILLIAMS_M</div>
-                    <div class="table-cell">82ND_ABN</div>
-                    <div class="table-cell percentage">5.4%</div>
-                    <div class="table-cell error-text">●</div>
-                </div>
-                <div class="table-row">
-                    <div class="table-cell rank">006</div>
-                    <div class="table-cell">SSGT_JOHNSON_T</div>
-                    <div class="table-cell">DELTA</div>
-                    <div class="table-cell percentage">4.9%</div>
-                    <div class="table-cell" style="color: #666;">○</div>
-                </div>
-                <div class="table-row">
-                    <div class="table-cell rank">007</div>
-                    <div class="table-cell">LT_ANDERSON_C</div>
-                    <div class="table-cell">101ST_ABN</div>
-                    <div class="table-cell percentage">4.7%</div>
-                    <div class="table-cell error-text">●</div>
-                </div>
-                <div class="table-row">
-                    <div class="table-cell rank">...</div>
-                    <div class="table-cell">...</div>
-                    <div class="table-cell">...</div>
-                    <div class="table-cell">...</div>
-                    <div class="table-cell">...</div>
-                </div>
-            </div>
-            
-            <div style="border: 1px solid #00ff41; padding: 15px; background: rgba(0, 255, 65, 0.02); font-size: 10px; color: #666;">
-                SEARCH_FILTERS:<br/>
-                >> FILTER --unit [UNIT_NAME]<br/>
-                >> FILTER --rank [RANK]<br/>
-                >> FILTER --status [ONLINE|OFFLINE]<br/>
-                >> SORT --stake [ASC|DESC]<br/>
-                >> EXPORT --format CSV
+                <div id="members-directory-rows"></div>
             </div>
         </div>
 

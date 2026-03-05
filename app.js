@@ -294,20 +294,33 @@ async function loadNetworkMap() {
 
 // Load network stats
 async function loadNetworkStats() {
-    const stats = await api('/api/stats');
-    const treasury = await api('/api/treasury');
+    try {
+        const [stats, treasury] = await Promise.all([
+            api('/api/stats'),
+            api('/api/treasury'),
+        ]);
 
-    const statsContainer = document.querySelector('.stats-section');
-    const statRows = statsContainer.querySelectorAll('.stat-row');
+        const totalEl = document.getElementById('stat-total-members');
+        if (totalEl) totalEl.textContent = formatLargeNumber(stats.total_members || 0);
 
-    statRows[0].querySelector('.stat-value').textContent = formatLargeNumber(stats.total_members);
-    statRows[1].querySelector('.stat-value').textContent = formatCurrency(stats.annual_income);
-    statRows[2].querySelector('.stat-value').textContent = formatLargeNumber(stats.active_nodes);
-    statRows[3].querySelector('.stat-value').textContent = formatCurrency(treasury.balance);
+        const activeEl = document.getElementById('stat-active');
+        if (activeEl) activeEl.textContent = formatLargeNumber(stats.active_nodes || stats.total_members || 0);
 
-    if (currentUser) {
-        statRows[4].querySelector('.stat-value').textContent = currentUser.stake_percentage + '%';
-        statRows[5].querySelector('.stat-value').textContent = formatCurrency(currentUser.last_dividend || 0);
+        const treasuryEl = document.getElementById('stat-treasury');
+        if (treasuryEl) treasuryEl.textContent = formatCurrency(treasury.balance || 0);
+
+        if (currentUser) {
+            const pointsEl = document.getElementById('stat-user-points');
+            if (pointsEl) pointsEl.textContent = formatLargeNumber(Math.floor((currentUser.stake_percentage || 0) * 1000));
+
+            const rankEl = document.getElementById('stat-user-rank');
+            if (rankEl) rankEl.textContent = '#' + (currentUser.rank || '--');
+
+            const statusEl = document.getElementById('stat-membership-status');
+            if (statusEl) statusEl.textContent = 'VERIFIED';
+        }
+    } catch (err) {
+        console.error('Failed to load network stats:', err);
     }
 }
 
@@ -440,35 +453,29 @@ async function loadMultipliers() {
 
 // Load members
 async function loadMembers() {
-    const { members } = await api('/api/members?limit=20');
-    const membersContainer = document.querySelector('#members .members-table');
+    try {
+        const { members } = await api('/api/members?limit=20');
+        const container = document.getElementById('members-directory-rows');
+        if (!container) return;
 
-    membersContainer.innerHTML = '<div style="font-weight: bold; margin-bottom: 15px;">COMPLETE_MEMBER_DIRECTORY</div>';
+        container.innerHTML = '';
 
-    // Add header
-    const headerRow = document.createElement('div');
-    headerRow.className = 'table-row';
-    headerRow.innerHTML = `
-        <div class="table-cell">RANK</div>
-        <div class="table-cell">CALLSIGN</div>
-        <div class="table-cell">UNIT</div>
-        <div class="table-cell">STAKE%</div>
-        <div class="table-cell">STATUS</div>
-    `;
-    membersContainer.appendChild(headerRow);
-
-    members.forEach((member, index) => {
-        const row = document.createElement('div');
-        row.className = 'table-row';
-        row.innerHTML = `
-            <div class="table-cell rank">${String(index + 1).padStart(3, '0')}</div>
-            <div class="table-cell">${member.username}</div>
-            <div class="table-cell">${member.unit || 'N/A'}</div>
-            <div class="table-cell percentage">${member.stake_percentage}%</div>
-            <div class="table-cell ${member.is_online ? 'error-text' : ''}" style="${!member.is_online ? 'color: #666;' : ''}">${member.is_online ? '●' : '○'}</div>
-        `;
-        membersContainer.appendChild(row);
-    });
+        members.forEach((member, index) => {
+            const row = document.createElement('div');
+            row.className = 'table-row';
+            const points = Math.floor((member.stake_percentage || 0) * 1000);
+            row.innerHTML = `
+                <div class="table-cell rank">${String(index + 1).padStart(3, '0')}</div>
+                <div class="table-cell">${member.username}</div>
+                <div class="table-cell">${member.unit || 'N/A'}</div>
+                <div class="table-cell percentage">${formatLargeNumber(points)}</div>
+                <div class="table-cell ${member.is_online ? 'error-text' : ''}" style="${!member.is_online ? 'color: #666;' : ''}">${member.is_online ? '●' : '○'}</div>
+            `;
+            container.appendChild(row);
+        });
+    } catch (err) {
+        console.error('Failed to load members:', err);
+    }
 }
 
 // Load channels
