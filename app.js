@@ -1621,6 +1621,10 @@ function handleSpeakingChange(username, isSpeaking) {
  */
 async function connectToVoiceRoom(netId, role) {
     if (!voiceEnabled) {
+        // Re-check — initial async check may not have completed yet
+        voiceEnabled = await checkVoiceConfig();
+    }
+    if (!voiceEnabled) {
         console.log('Voice not available');
         return false;
     }
