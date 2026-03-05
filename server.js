@@ -22,7 +22,10 @@ initDatabase();
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' })); // Increased limit for base64 image uploads
-app.use(express.static(path.join(__dirname)));
+// Serve Vite build output in production, root dir in development
+const isProduction = process.env.NODE_ENV === 'production';
+const staticDir = isProduction ? path.join(__dirname, 'dist') : __dirname;
+app.use(express.static(staticDir));
 
 // Helper to get DB connection
 const db = () => getDatabase();
@@ -1331,7 +1334,7 @@ app.post('/api/nets/:id/refresh-token', async (req, res) => {
 
 // Serve index.html for all other routes (SPA support)
 app.get('/{*path}', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(staticDir, 'index.html'));
 });
 
 server.listen(PORT, () => {
