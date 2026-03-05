@@ -1388,9 +1388,10 @@ app.post('/api/voice/:netId/join', async (req, res) => {
     }
 });
 
-// Exchange SDP answer — complete WebRTC handshake
-app.post('/api/voice/:netId/answer', async (req, res) => {
-    const { userId, sessionDescription } = req.body;
+// Push local track to CF + do SDP exchange (speakers only)
+// Also registers the track and broadcasts to other participants.
+app.post('/api/voice/:netId/publish-track', async (req, res) => {
+    const { userId, trackName, sessionDescription, mid } = req.body;
     const netId = req.params.netId;
 
     try {
@@ -1400,35 +1401,28 @@ app.post('/api/voice/:netId/answer', async (req, res) => {
             return res.status(404).json({ error: 'Not in voice room' });
         }
 
-        // Forward client's offer to CF and get answer
+        console.log(`[CF] Publishing track ${trackName} for ${participant.username} (session: ${participant.sessionId}, mid: ${mid})`);
+
+        // Push local track to CF — sends SDP offer, gets answer
         const result = await cfVoice.pushTrack(participant.sessionId, {
             sessionDescription,
-            trackName: `audio-${userId}`,
+            trackName,
+            mid,
         });
 
-        res.json(result);
-    } catch (error) {
-        console.error('Voice answer error:', error);
-        res.status(500).json({ error: 'Failed to exchange SDP' });
-    }
-});
+        console.log(`[CF] Push response: hasAnswer=${!!result.sessionDescription}, renegotiate=${result.requiresImmediateRenegotiation}`);
 
-// Notify server that a track was published
-app.post('/api/voice/:netId/publish', async (req, res) => {
-    const { userId, trackName } = req.body;
-    const netId = req.params.netId;
-
-    try {
+        // Register track in room state
         const trackInfo = await cfVoice.onTrackPublished(netId, userId, trackName);
 
-        // Notify other participants via WebSocket to pull this new track
+        // Notify other participants to pull this new track
         if (trackInfo) {
             broadcastToNet(netId, 'voice:track:new', trackInfo);
         }
 
-        res.json({ ok: true });
+        res.json(result);
     } catch (error) {
-        console.error('Voice publish error:', error);
+        console.error('Voice publish-track error:', error);
         res.status(500).json({ error: 'Failed to publish track' });
     }
 });
@@ -1442,8 +1436,11 @@ app.post('/api/voice/:netId/pull', async (req, res) => {
         const room = cfVoice.getRoom(netId);
         const participant = room.participants.get(String(userId));
         if (!participant) {
+            console.error(`[CF] Pull: user ${userId} not found in room net-${netId}`);
             return res.status(404).json({ error: 'Not in voice room' });
         }
+
+        console.log(`[CF] ${participant.username} pulling tracks:`, tracks.map(t => t.trackName));
 
         const result = await cfVoice.pullTracks(participant.sessionId, tracks);
 

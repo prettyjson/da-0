@@ -99,16 +99,28 @@ async function renegotiate(sessionId) {
  * Client sends their SDP with the audio track, CF returns updated SDP.
  */
 async function pushTrack(sessionId, trackData) {
+    const trackEntry = {
+        location: 'local',
+        trackName: trackData.trackName,
+    };
+    // Include mid if provided (maps SDP m-line to track name)
+    if (trackData.mid) {
+        trackEntry.mid = trackData.mid;
+    }
+
+    const body = {
+        sessionDescription: trackData.sessionDescription,
+        tracks: [trackEntry],
+    };
+
+    console.log(`[CF] POST /sessions/${sessionId}/tracks/new — pushing local track: ${trackData.trackName}`);
+
     const data = await cfFetch(`/sessions/${sessionId}/tracks/new`, {
         method: 'POST',
-        body: JSON.stringify({
-            sessionDescription: trackData.sessionDescription,
-            tracks: [{
-                location: 'local',
-                trackName: trackData.trackName,
-            }],
-        }),
+        body: JSON.stringify(body),
     });
+
+    console.log(`[CF] Push response: sessionDescription=${!!data.sessionDescription}, tracks=${data.tracks?.length || 0}`);
     return data;
 }
 
@@ -117,16 +129,20 @@ async function pushTrack(sessionId, trackData) {
  * Returns updated SDP with the remote tracks.
  */
 async function pullTracks(sessionId, tracks) {
+    const remoteTracks = tracks.map(t => ({
+        location: 'remote',
+        trackName: t.trackName,
+        sessionId: t.sessionId,
+    }));
+
+    console.log(`[CF] POST /sessions/${sessionId}/tracks/new — pulling ${remoteTracks.length} remote track(s):`, remoteTracks.map(t => t.trackName));
+
     const data = await cfFetch(`/sessions/${sessionId}/tracks/new`, {
         method: 'POST',
-        body: JSON.stringify({
-            tracks: tracks.map(t => ({
-                location: 'remote',
-                trackName: t.trackName,
-                sessionId: t.sessionId, // Session that published this track
-            })),
-        }),
+        body: JSON.stringify({ tracks: remoteTracks }),
     });
+
+    console.log(`[CF] Pull response: sessionDescription=${!!data.sessionDescription}, requiresRenegotiation=${data.requiresImmediateRenegotiation}, tracks=${data.tracks?.length || 0}`);
     return data;
 }
 

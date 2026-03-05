@@ -1634,8 +1634,7 @@ async function connectToVoiceRoom(netId, role) {
             netId,
             currentUser,
             role,
-            handleSpeakingChange, // speaking callback
-            null // track added callback
+            handleSpeakingChange
         );
 
         if (success) {
