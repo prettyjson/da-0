@@ -32,18 +32,15 @@ const rooms = new Map();
 
 // ============ CLOUDFLARE API HELPERS ============
 
-function cfHeaders() {
-    return {
-        'Authorization': `Bearer ${CF_APP_SECRET}`,
-        'Content-Type': 'application/json',
-    };
-}
-
 async function cfFetch(path, options = {}) {
     const url = `${CF_API_BASE}/apps/${CF_APP_ID}${path}`;
+    const headers = { 'Authorization': `Bearer ${CF_APP_SECRET}` };
+    if (options.body) {
+        headers['Content-Type'] = 'application/json';
+    }
     const res = await fetch(url, {
         ...options,
-        headers: { ...cfHeaders(), ...options.headers },
+        headers: { ...headers, ...options.headers },
     });
 
     if (!res.ok) {
@@ -62,10 +59,9 @@ async function cfFetch(path, options = {}) {
  * Returns { sessionId, sessionDescription (SDP offer) }
  */
 async function createSession() {
-    const data = await cfFetch('/sessions/new', { method: 'POST', body: '{}' });
+    const data = await cfFetch('/sessions/new', { method: 'POST' });
     return {
         sessionId: data.sessionId,
-        sessionDescription: data.sessionDescription, // SDP offer from CF
     };
 }
 
@@ -211,7 +207,6 @@ async function joinRoom(netId, userId, username, role) {
 
     return {
         sessionId: session.sessionId,
-        sessionDescription: session.sessionDescription,
         alreadyJoined: false,
         // Tell the client which tracks to pull (all current speakers)
         speakerTracks: getSpeakerTracks(netId, userId),
