@@ -1,3 +1,5 @@
+import { initMap, updateMapMarkers, updateMapStats } from './map.js';
+
 // Global state
 let currentStep = 1;
 let verificationData = {
@@ -154,8 +156,26 @@ async function loadAllData() {
         loadChannels(),
         loadNets(),
         loadNetsInOverview(),
-        loadUserProfile()
+        loadUserProfile(),
+        loadNetworkMap()
     ]);
+}
+
+// Load world map with member locations
+async function loadNetworkMap() {
+    try {
+        initMap('network-map');
+        const data = await api('/api/locations/map');
+        if (data.locations) {
+            updateMapMarkers(data.locations);
+        }
+        if (data.stats) {
+            updateMapStats(data.stats);
+        }
+    } catch (err) {
+        // Map is non-critical, just init empty
+        initMap('network-map');
+    }
 }
 
 // Load network stats

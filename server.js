@@ -1332,6 +1332,64 @@ app.post('/api/nets/:id/refresh-token', async (req, res) => {
     }
 });
 
+// ============ LOCATIONS / MAP ============
+
+// Get all primary locations for the map
+app.get('/api/locations/map', (req, res) => {
+    try {
+        // For now, return stub data until Supabase is wired up
+        // This will be replaced with real DB queries
+        const stubLocations = [
+            { lat: 38.9072, lng: -77.0369, callsign: 'COL_HAYES_R', city: 'Washington DC', country: 'USA' },
+            { lat: 33.7490, lng: -84.3880, callsign: 'MAJ_CHEN_L', city: 'Atlanta', country: 'USA' },
+            { lat: 32.7767, lng: -96.7970, callsign: 'CSGT_RODRIGUEZ', city: 'Dallas', country: 'USA' },
+            { lat: 36.1627, lng: -86.7816, callsign: 'LCDR_PATEL_K', city: 'Nashville', country: 'USA' },
+            { lat: 47.6062, lng: -122.3321, callsign: 'CPT_BROOKS_M', city: 'Seattle', country: 'USA' },
+            { lat: 21.3069, lng: -157.8583, callsign: 'MAJ_TANAKA_S', city: 'Honolulu', country: 'USA' },
+            { lat: 51.5074, lng: -0.1278, callsign: 'LT_WILLIAMS_D', city: 'London', country: 'UK' },
+            { lat: 48.8566, lng: 2.3522, callsign: 'COL_DUBOIS_P', city: 'Paris', country: 'France' },
+            { lat: 35.6762, lng: 139.6503, callsign: 'LCDR_NAKAMURA', city: 'Tokyo', country: 'Japan' },
+            { lat: 49.2827, lng: -123.1207, callsign: 'CPT_FRASER_A', city: 'Vancouver', country: 'Canada' },
+            { lat: 1.3521, lng: 103.8198, callsign: 'MAJ_LIM_W', city: 'Singapore', country: 'Singapore' },
+            { lat: -33.8688, lng: 151.2093, callsign: 'LTCOL_KEMP_J', city: 'Sydney', country: 'Australia' },
+        ];
+
+        // Calculate stats
+        const cities = new Set(stubLocations.map(l => l.city));
+        const countries = new Set(stubLocations.map(l => l.country));
+
+        res.json({
+            locations: stubLocations,
+            stats: {
+                members: stubLocations.length,
+                cities: cities.size,
+                countries: countries.size,
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to load map data' });
+    }
+});
+
+// Get user's locations (max 3)
+app.get('/api/locations/:userId', (req, res) => {
+    // Stub - will be replaced with Supabase query
+    res.json({ locations: [] });
+});
+
+// Add/update a location
+app.post('/api/locations', (req, res) => {
+    // Stub - will be replaced with Supabase insert
+    const { userId, city, country, isPrimary, label } = req.body;
+    res.json({ success: true, message: 'Location saved' });
+});
+
+// Delete a location
+app.delete('/api/locations/:locationId', (req, res) => {
+    // Stub - will be replaced with Supabase delete
+    res.json({ success: true });
+});
+
 // Serve index.html for all other routes (SPA support)
 app.get('/{*path}', (req, res) => {
     res.sendFile(path.join(staticDir, 'index.html'));
