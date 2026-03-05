@@ -27,8 +27,33 @@
             <div class="auth-logo">🎖️ VETNET</div>
             <div class="auth-subtitle">CREDENTIALED_VETERANS_NETWORK_v2.1.3</div>
             
-            <!-- Login Form -->
-            <div id="login-form" class="auth-form">
+            <!-- CDP Wallet Login (Primary) -->
+            <div id="wallet-login-form" class="auth-form">
+                <div class="form-group">
+                    <label class="form-label">EMAIL:</label>
+                    <input type="email" class="form-input" id="wallet-email" placeholder="your.email@example.com" />
+                </div>
+                <button class="btn-primary" onclick="handleWalletLogin()">ENTER_WITH_EMAIL</button>
+                <div class="auth-divider">— OR —</div>
+                <button class="btn-secondary" onclick="handleGoogleLogin()">CONTINUE_WITH_GOOGLE</button>
+            </div>
+
+            <!-- OTP Verification -->
+            <div id="otp-form" class="auth-form hidden">
+                <div style="margin-bottom: 15px; font-size: 11px; color: #888;">
+                    VERIFICATION_CODE_SENT_TO: <span id="otp-email-display" style="color: #00ff41;"></span>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">ENTER_CODE:</label>
+                    <input type="text" class="form-input" id="otp-code" placeholder="000000" maxlength="6" style="text-align: center; font-size: 18px; letter-spacing: 8px;" />
+                </div>
+                <button class="btn-primary" onclick="handleVerifyOTP()">VERIFY</button>
+                <div class="auth-divider">— OR —</div>
+                <button class="btn-secondary" onclick="showWalletLogin()">BACK</button>
+            </div>
+
+            <!-- Legacy Login (dev fallback) -->
+            <div id="login-form" class="auth-form hidden">
                 <div class="form-group">
                     <label class="form-label">USERNAME:</label>
                     <input type="text" class="form-input" id="login-username" placeholder="SGT_MARTINEZ_J" />
@@ -39,10 +64,10 @@
                 </div>
                 <button class="btn-primary" onclick="handleLogin()">LOGIN</button>
                 <div class="auth-divider">— OR —</div>
-                <button class="btn-secondary" onclick="showSignup()">CREATE_NEW_ACCOUNT</button>
+                <button class="btn-secondary" onclick="showWalletLogin()">BACK</button>
             </div>
-            
-            <!-- Signup Form -->
+
+            <!-- Signup Form (legacy) -->
             <div id="signup-form" class="auth-form hidden">
                 <div class="form-group">
                     <label class="form-label">EMAIL:</label>
@@ -58,7 +83,11 @@
                 </div>
                 <button class="btn-primary" onclick="startVerification()">BEGIN_VERIFICATION</button>
                 <div class="auth-divider">— OR —</div>
-                <button class="btn-secondary" onclick="showLogin()">BACK_TO_LOGIN</button>
+                <button class="btn-secondary" onclick="showWalletLogin()">BACK</button>
+            </div>
+
+            <div style="margin-top: 15px; text-align: center;">
+                <button onclick="showLegacyLogin()" style="background: none; border: none; color: #444; cursor: pointer; font-family: inherit; font-size: 10px;">DEV_LOGIN >></button>
             </div>
             
             <div style="margin-top: 30px; text-align: center; font-size: 10px; color: #666;">

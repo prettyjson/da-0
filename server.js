@@ -145,6 +145,53 @@ app.post('/api/auth/logout', (req, res) => {
     res.json({ success: true });
 });
 
+// ============ CDP AUTH SYNC ============
+// Called after Coinbase CDP wallet login to create/update user in our DB
+app.post('/api/auth/sync', (req, res) => {
+    const { cdpUserId, email, walletAddress } = req.body;
+
+    if (!walletAddress) {
+        return res.status(400).json({ error: 'Wallet address required' });
+    }
+
+    try {
+        // Check if user exists by wallet address
+        let user = db().prepare('SELECT * FROM users WHERE username = ?').get(walletAddress.toUpperCase());
+
+        if (user) {
+            // Existing user - update online status
+            db().prepare('UPDATE users SET is_online = 1 WHERE id = ?').run(user.id);
+            const badges = db().prepare('SELECT badge_name FROM user_badges WHERE user_id = ?').all(user.id);
+            user.badges = badges.map(b => b.badge_name);
+            res.json({ success: true, user, isNewUser: false });
+        } else {
+            // New user - create account (pending DD-214 verification)
+            const callsign = email
+                ? email.split('@')[0].toUpperCase().replace(/[^A-Z0-9]/g, '_')
+                : walletAddress.slice(0, 10).toUpperCase();
+
+            const result = db().prepare(`
+                INSERT INTO users (username, email, is_online, stake_percentage, join_date)
+                VALUES (?, ?, 1, 0.1, ?)
+            `).run(callsign, email || null, new Date().toISOString().slice(0, 10));
+
+            const newUser = db().prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
+            newUser.badges = [];
+
+            res.json({
+                success: true,
+                user: newUser,
+                isNewUser: true,
+                // New users must complete DD-214 verification
+                requiresVerification: true,
+            });
+        }
+    } catch (error) {
+        console.error('Auth sync error:', error);
+        res.status(500).json({ error: 'Failed to sync user' });
+    }
+});
+
 // ============ NETWORK STATS ROUTES ============
 app.get('/api/stats', (req, res) => {
     const stats = db().prepare('SELECT * FROM network_stats WHERE id = 1').get();

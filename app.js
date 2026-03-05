@@ -1,4 +1,5 @@
 import { initMap, updateMapMarkers, updateMapStats } from './map.js';
+import { initWallet, sendEmailOTP, verifyOTP, loginWithGoogle, signOut, syncUserWithBackend, getWalletAddress } from './wallet.js';
 
 // Global state
 let currentStep = 1;
@@ -34,14 +35,102 @@ function formatLargeNumber(num) {
 }
 
 // Auth Functions
+let otpFlowId = null;
+
+function hideAllAuthForms() {
+    ['wallet-login-form', 'otp-form', 'login-form', 'signup-form'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
+}
+
+function showWalletLogin() {
+    hideAllAuthForms();
+    document.getElementById('wallet-login-form').classList.remove('hidden');
+}
+
+function showLegacyLogin() {
+    hideAllAuthForms();
+    document.getElementById('login-form').classList.remove('hidden');
+}
+
 function showSignup() {
-    document.getElementById('login-form').classList.add('hidden');
+    hideAllAuthForms();
     document.getElementById('signup-form').classList.remove('hidden');
 }
 
 function showLogin() {
-    document.getElementById('signup-form').classList.add('hidden');
-    document.getElementById('login-form').classList.remove('hidden');
+    showLegacyLogin();
+}
+
+// CDP Wallet Login - Email OTP
+async function handleWalletLogin() {
+    const email = document.getElementById('wallet-email').value;
+    if (!email) return;
+
+    try {
+        const result = await sendEmailOTP(email);
+        otpFlowId = result.flowId;
+
+        hideAllAuthForms();
+        document.getElementById('otp-form').classList.remove('hidden');
+        document.getElementById('otp-email-display').textContent = email;
+        document.getElementById('otp-code').focus();
+    } catch (err) {
+        console.error('Email OTP failed:', err);
+        alert('Failed to send verification code. Please try again.');
+    }
+}
+
+// CDP Wallet Login - Verify OTP
+async function handleVerifyOTP() {
+    const otp = document.getElementById('otp-code').value;
+    if (!otp || !otpFlowId) return;
+
+    try {
+        const result = await verifyOTP(otpFlowId, otp);
+
+        // Sync with our backend
+        const syncResult = await syncUserWithBackend({
+            cdpUserId: result.user.cdpUserId,
+            email: result.user.email,
+            walletAddress: result.user.walletAddress,
+        });
+
+        if (syncResult.success) {
+            currentUser = syncResult.user;
+            localStorage.setItem('vetnet_session', JSON.stringify({
+                userId: currentUser.id,
+                username: currentUser.username,
+                walletAddress: result.user.walletAddress,
+            }));
+
+            if (syncResult.requiresVerification) {
+                // New user - go to DD-214 verification
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('verification-screen').classList.remove('hidden');
+            } else {
+                // Existing verified user - go to main app
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                await loadAllData();
+            }
+        }
+    } catch (err) {
+        console.error('OTP verification failed:', err);
+        alert('Invalid code. Please try again.');
+    }
+}
+
+// CDP Wallet Login - Google OAuth
+async function handleGoogleLogin() {
+    try {
+        await loginWithGoogle();
+        // Page will redirect to Google, then back
+    } catch (err) {
+        console.error('Google login failed:', err);
+        alert('Google login failed. Please try again.');
+    }
 }
 
 async function handleLogin() {
@@ -108,8 +197,32 @@ async function checkSavedSession() {
     return false;
 }
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', checkSavedSession);
+// Initialize CDP wallet and check for existing session on page load
+async function initApp() {
+    // Try CDP wallet init first (handles OAuth redirect returns)
+    try {
+        const walletResult = await initWallet();
+        if (walletResult.signedIn && walletResult.user) {
+            // User returned from OAuth redirect or has active session
+            const syncResult = await syncUserWithBackend(walletResult.user);
+            if (syncResult.success) {
+                currentUser = syncResult.user;
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('main-app').classList.add('active');
+                document.getElementById('current-user').textContent = currentUser.username;
+                await loadAllData();
+                return;
+            }
+        }
+    } catch (err) {
+        console.warn('[WALLET] CDP init skipped:', err.message);
+    }
+
+    // Fallback to saved session (legacy login)
+    await checkSavedSession();
+}
+
+document.addEventListener('DOMContentLoaded', initApp);
 
 async function startVerification() {
     const email = document.getElementById('signup-email').value;
@@ -2628,5 +2741,8 @@ Object.assign(window, {
     shareInvite, showCreateNetModal, showLogin, showProfile,
     showSection, showSignup, startFaceVerification,
     startVerification, switchChannel, toggleMute, leaveNet,
-    handleDD214Upload
+    handleDD214Upload,
+    // CDP wallet auth
+    handleWalletLogin, handleVerifyOTP, handleGoogleLogin,
+    showWalletLogin, showLegacyLogin,
 });
